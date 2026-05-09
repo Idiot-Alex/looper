@@ -378,11 +378,10 @@ QA prompt 里必须强调：
 
 1. 当前任务 `task.json`
 2. 当前项目中相关文件的最新内容
-3. 上一轮 `qa_report.json`
-4. `last_stdout.txt`
-5. `last_stderr.txt`
-6. `last_exit_code.txt`
-7. 上一轮 `engineer_output.json`
+3. 上一轮 `qa_report.json`（内含 evidence 数组，已覆盖每条命令的 stdout/stderr/exit_code）
+4. 上一轮 `engineer_output.json`
+
+> 注意：修正 3 已将 `evidence` 从单条记录改为数组，`qa_report.json` 包含所有执行结果，无需再单独传 `runtime/last_*` 文件。
 
 这样 Engineer 才知道：
 - 自己上次写了什么

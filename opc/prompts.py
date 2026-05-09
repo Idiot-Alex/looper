@@ -73,10 +73,17 @@ def build_manager_prompt(
   "acceptance_criteria": ["验收标准1", "验收标准2", "..."],
   "background_commands": ["需要后台启动的命令"],
   "test_commands": ["前台验证命令"],
-  "startup_wait_seconds": 启动等待秒数,
+  "startup_wait_seconds": 启动最大等待秒数,
+  "health_check_port": 服务端口号,
   "notes": "其他约束或提示"
 }}
 ```
+
+**字段说明**：
+- `background_commands`：后台命令用 `&` 结尾，如 `python3 server.py &`
+- `health_check_port`：服务端口号（必须设置），Runner 会先探端口再执行测试
+- `startup_wait_seconds`：端口探测的最大超时秒数，默认 10
+- `test_commands`：用 `curl` 验证的命令
 
 **注意**：
 - `background_commands` 先执行

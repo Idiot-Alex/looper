@@ -217,14 +217,20 @@ def run_qa(status: dict) -> tuple[bool, str]:
     
     # 先执行 background_commands
     background_commands = task_data.get("background_commands", [])
+    health_port = task_data.get("health_check_port")
+    startup_wait = task_data.get("startup_wait_seconds", 10)
+    
     if background_commands:
         print(f"🚀 启动后台进程: {len(background_commands)} 个")
+        if health_port:
+            print(f"   健康检查端口: {health_port}")
         try:
             execute_background_commands(
                 background_commands,
-                task_data.get("startup_wait_seconds", 2),
+                startup_wait,
                 session_id,
                 str(PROJECT_ROOT),
+                health_check_port=health_port,
             )
         except Exception as e:
             print(f"⚠️ 后台启动失败: {e}")
@@ -382,9 +388,11 @@ def main():
         status = init_status()
         print(f"🆕 新会话: {status.get('session_id')}")
     
-    # 初始化 API 重试计数
+    # 初始化重试计数
     if "api_retry_count" not in status:
         status["api_retry_count"] = 0
+    if "parse_retry_count" not in status:
+        status["parse_retry_count"] = 0
     
     # 主循环
     while not is_terminal(status.get("stage", "")):
@@ -397,9 +405,18 @@ def main():
         try:
             if stage == "inbox":
                 success, error_type = run_manager(status)
+                status["parse_retry_count"] = 0  # 新角色阶段，重置 parse 计数
                 if success:
                     status["stage"] = "manager_done"
                     status["api_retry_count"] = 0
+                elif error_type == "parse_error":
+                    # parse 失败 → 重试当前角色 1 次
+                    status["parse_retry_count"] += 1
+                    if status["parse_retry_count"] > 1:
+                        print(f"❌ Manager JSON 解析连续失败 2 次，进入 parse_error")
+                        status["stage"] = "parse_error"
+                    else:
+                        print(f"⚠️ Manager JSON 解析失败，重试 (1/1)")
                 else:
                     status["api_retry_count"] += 1
                     if status["api_retry_count"] >= MAX_API_RETRIES:
@@ -408,14 +425,24 @@ def main():
                         save_status(status)
                         sys.exit(1)
                     print(f"⚠️ API 调用失败，重试 ({status['api_retry_count']}/{MAX_API_RETRIES})")
-                    continue
             
             elif stage in ("manager_done", "engineer_retry"):
                 is_retry = (stage == "engineer_retry")
+                # engineer_retry 进入新角色调用，重置 parse 计数 (修正4)
+                if is_retry:
+                    status["parse_retry_count"] = 0
                 success, error_type = run_engineer(status, is_retry)
                 if success:
                     status["stage"] = "engineer_done"
                     status["api_retry_count"] = 0
+                    status["parse_retry_count"] = 0
+                elif error_type == "parse_error":
+                    status["parse_retry_count"] += 1
+                    if status["parse_retry_count"] > 1:
+                        print(f"❌ Engineer JSON 解析连续失败 2 次，进入 parse_error")
+                        status["stage"] = "parse_error"
+                    else:
+                        print(f"⚠️ Engineer JSON 解析失败，重试 (1/1)")
                 else:
                     status["api_retry_count"] += 1
                     if status["api_retry_count"] >= MAX_API_RETRIES:
@@ -424,13 +451,20 @@ def main():
                         save_status(status)
                         sys.exit(1)
                     print(f"⚠️ API 调用失败，重试 ({status['api_retry_count']}/{MAX_API_RETRIES})")
-                    continue
             
             elif stage == "engineer_done":
+                status["parse_retry_count"] = 0  # 新角色阶段
                 success, error_type = run_qa(status)
                 if success:
                     status["stage"] = "qa_done"
                     status["api_retry_count"] = 0
+                elif error_type == "parse_error":
+                    status["parse_retry_count"] += 1
+                    if status["parse_retry_count"] > 1:
+                        print(f"❌ QA JSON 解析连续失败 2 次，进入 parse_error")
+                        status["stage"] = "parse_error"
+                    else:
+                        print(f"⚠️ QA JSON 解析失败，重试 (1/1)")
                 else:
                     status["api_retry_count"] += 1
                     if status["api_retry_count"] >= MAX_API_RETRIES:
@@ -439,11 +473,11 @@ def main():
                         save_status(status)
                         sys.exit(1)
                     print(f"⚠️ API 调用失败，重试 ({status['api_retry_count']}/{MAX_API_RETRIES})")
-                    continue
             
             elif stage == "qa_done":
                 handle_qa_result(status)
                 status["api_retry_count"] = 0
+                status["parse_retry_count"] = 0
             
             else:
                 print(f"❌ 未知状态: {stage}")

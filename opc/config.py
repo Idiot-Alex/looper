@@ -10,6 +10,11 @@ from dotenv import load_dotenv
 _project_root = Path(__file__).parent.parent.resolve()
 load_dotenv(_project_root / ".env")
 
+# 关闭系统代理（Python urllib/httpx 会读取 macOS 系统代理设置）
+# 如果代理进程没在跑，会导致所有 HTTP 请求 Connection refused
+os.environ["no_proxy"] = "*"
+os.environ["NO_PROXY"] = "*"
+
 # 项目根目录
 PROJECT_ROOT = _project_root
 
@@ -41,11 +46,11 @@ INBOX_FILE = TASKS_DIR / "inbox.md"
 # LLM 配置
 DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY", "")
 DEEPSEEK_BASE_URL = "https://api.deepseek.com"
-DEEPSEEK_MODEL = "deepseek-chat"
+DEEPSEEK_MODEL = "deepseek-v4-flash"
 
 MINIMAX_API_KEY = os.environ.get("MINIMAX_API_KEY", "")
 MINIMAX_BASE_URL = "https://api.minimaxi.com/v1"
-MINIMAX_MODEL = "abab6.5s-chat"
+MINIMAX_MODEL = "MiniMax-M2.5"
 
 # 执行配置
 DEFAULT_COMMAND_TIMEOUT = 30  # 秒

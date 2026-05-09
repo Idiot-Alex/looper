@@ -39,3 +39,7 @@ opc/tasks/qa_report.json
 
 # 保留 inbox.md
 !opc/tasks/inbox.md
+
+# OPC generated files
+server.py
+server.py.bak

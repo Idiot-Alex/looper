@@ -201,7 +201,8 @@ def execute_background_commands(
     commands: List[str],
     startup_wait: int = DEFAULT_STARTUP_TIMEOUT,
     session_id: str = "default",
-    cwd: Optional[str] = None
+    cwd: Optional[str] = None,
+    health_check_port: Optional[int] = None,
 ) -> List[subprocess.Popen]:
     """
     执行后台命令列表
@@ -211,6 +212,7 @@ def execute_background_commands(
         startup_wait: 最大等待秒数
         session_id: 会话 ID
         cwd: 工作目录
+        health_check_port: 健康检查端口（优先用端口探测）
     
     Returns:
         Popen 对象列表
@@ -220,6 +222,8 @@ def execute_background_commands(
     started_at = time.strftime("%Y-%m-%dT%H:%M:%SZ")
     
     for i, cmd in enumerate(commands):
+        # 去掉末尾 &，subprocess.Popen 本身就是后台运行
+        cmd = cmd.rstrip().rstrip("&").strip()
         proc = start_background_process(cmd, cwd)
         procs.append(proc)
         pids.append(proc.pid)
@@ -239,9 +243,17 @@ def execute_background_commands(
         "started_at": started_at,
     })
     
-    # 等待启动（端口探测 + 超时兜底）
-    # 注意：这里简化处理，实际应检查每个命令对应的端口
-    time.sleep(startup_wait)
+    # 等待启动：端口探测优先，超时兜底
+    if health_check_port:
+        print(f"⏳ 端口探测 {health_check_port}...")
+        ok = wait_for_port(health_check_port, timeout=startup_wait)
+        if ok:
+            print(f"✅ 端口 {health_check_port} 已就绪")
+            time.sleep(1.0)  # 端口通了不代表 HTTP 就绪，多等1秒
+        else:
+            print(f"⚠️ 端口 {health_check_port} 探测超时 ({startup_wait}s)，继续执行测试")
+    else:
+        time.sleep(startup_wait)
     
     return procs
 
