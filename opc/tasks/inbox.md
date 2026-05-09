@@ -1,13 +1,6 @@
-实现一个简单的 Python HTTP 服务
-
+实现一个 Python HTTP 服务
 要求：
-- 监听 8080 端口
-- 访问根路径 / 时返回 "Hello OPC"
-- 不引入额外依赖（使用内置 http.server）
-- 启动后可以用 curl 测试
-
-示例：
-```bash
-curl http://localhost:8080/
-# 应返回: Hello OPC
-```
+- 监听 9090 端口
+- 访问 / 时返回 JSON: {"status": "ok", "message": "Hello OPC"}
+- Content-Type 必须是 application/json
+- 使用内置 http.server 模块，不引入额外依赖
