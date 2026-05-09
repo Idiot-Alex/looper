@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+ENV/
+*.egg-info/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# macOS
+.DS_Store
+
+# Alma (AI assistant)
+.alma-snapshots/
+.alma/
+
+# Environment
+.env
+
+# OPC runtime files
+# 保留目录结构但忽略运行时生成的内容
+opc/runtime/*
+opc/logs/sessions/*
+opc/logs/prompts/*
+opc/logs/raw_outputs/*
+opc/logs/command_runs/*
+opc/tasks/status.json
+opc/tasks/task.json
+opc/tasks/engineer_output.json
+opc/tasks/qa_report.json
+
+# 保留 inbox.md
+!opc/tasks/inbox.md
