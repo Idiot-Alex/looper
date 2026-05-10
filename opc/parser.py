@@ -96,14 +96,34 @@ def validate_engineer_output(data: dict) -> bool:
 
 
 def validate_qa_output(data: dict) -> bool:
-    """验证 QA 输出格式"""
-    required_fields = ["passed", "reason", "evidence", "next_action"]
-    for field in required_fields:
-        if field not in data:
+    """
+    验证 QA 输出格式
+    
+    支持新旧两种格式：
+    - 新格式（有 criterion_results）
+    - 旧格式（仅有 passed + reason）
+    """
+    # 基础字段
+    if "passed" not in data:
+        return False
+    
+    # 新格式：有 criterion_results
+    if "criterion_results" in data:
+        if not isinstance(data["criterion_results"], list):
+            return False
+        for result in data["criterion_results"]:
+            if not isinstance(result, dict):
+                return False
+            if "criterion" not in result or "passed" not in result:
+                return False
+    
+    # 旧格式：有 evidence
+    if "evidence" in data:
+        if not isinstance(data["evidence"], list):
             return False
     
-    # evidence 必须是列表
-    if not isinstance(data.get("evidence"), list):
+    # 至少要有 reason 或 failed_checks 之一
+    if not data.get("reason") and not data.get("failed_checks"):
         return False
     
     return True

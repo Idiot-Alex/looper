@@ -135,30 +135,32 @@ def build_engineer_prompt(
             prompt += f"\n### {path}\n```\n{content}\n```\n"
     
     if qa_report:
+        # 导入修复上下文构建函数
+        from opc.prompts import build_repair_context
+        
         prompt += f"""
 ## QA 报告 (上一轮失败原因)
 
 **Passed**: {qa_report.get('passed', False)}
 **Reason**: {qa_report.get('reason', 'N/A')}
-
 """
         
-        if qa_report.get('failed_checks'):
-            prompt += "**Failed Checks**:\n"
-            for check in qa_report.get('failed_checks', []):
-                prompt += f"- {check}\n"
-        
-        evidence = qa_report.get('evidence', [])
-        if evidence and isinstance(evidence, list):
-            prompt += "\n**Evidence**:\n"
-            for ev in evidence:
-                if isinstance(ev, dict):
-                    prompt += f"- Command: {ev.get('command', 'N/A')}\n"
-                    prompt += f"  Stdout: {ev.get('stdout', 'N/A')[:200]}\n"
-                    prompt += f"  Stderr: {ev.get('stderr', 'N/A')[:200]}\n"
-                    prompt += f"  Exit Code: {ev.get('exit_code', 'N/A')}\n"
-        elif isinstance(evidence, dict):
-            prompt += f"\n**Evidence**:\n{evidence}\n"
+        # 添加修复上下文
+        if not qa_report.get('passed', False):
+            failure_type = qa_report.get('failure_type', 'unknown')
+            repair_context = build_repair_context(failure_type, qa_report, task_json)
+            prompt += f"\n{repair_context}\n"
+        else:
+            # 即使通过了也给出证据供参考
+            evidence = qa_report.get('evidence', [])
+            if evidence and isinstance(evidence, list):
+                prompt += "\n**Evidence**:\n"
+                for ev in evidence:
+                    if isinstance(ev, dict):
+                        prompt += f"- Command: {ev.get('command', 'N/A')}\n"
+                        prompt += f"  Stdout: {ev.get('stdout', 'N/A')[:200]}\n"
+                        prompt += f"  Stderr: {ev.get('stderr', 'N/A')[:200]}\n"
+                        prompt += f"  Exit Code: {ev.get('exit_code', 'N/A')}\n"
     
     prompt += """
 ## 输出要求
@@ -271,3 +273,119 @@ def load_agent_prompt(role: str) -> str:
     if role_file.exists():
         return role_file.read_text(encoding="utf-8")
     return ""
+
+
+# =====================
+# 任务类型模板
+# =====================
+
+TASK_TYPE_TEMPLATES = {
+    "http_api": {
+        "name": "HTTP API 服务",
+        "keywords": ["端口", "监听", "HTTP", "curl", "localhost", "GET", "POST", "REST"],
+        "test_template": 'curl -s http://localhost:{port}/',
+        "health_check": True,
+    },
+    "cli": {
+        "name": "命令行工具",
+        "keywords": ["CLI", "命令行", "参数", "--help", "-h", "usage"],
+        "test_template": 'python3 {script} --help',
+        "health_check": False,
+    },
+    "script": {
+        "name": "脚本工具",
+        "keywords": ["脚本", "shell", "bash", "./"],
+        "test_template": './{script}',
+        "health_check": False,
+    },
+}
+
+
+def infer_task_type(inbox_content: str) -> str:
+    """
+    根据 inbox 内容推断任务类型
+    
+    Returns:
+        http_api / cli / script
+    """
+    content_lower = inbox_content.lower()
+    
+    scores = {}
+    for task_type, template in TASK_TYPE_TEMPLATES.items():
+        score = sum(1 for keyword in template["keywords"] if keyword.lower() in content_lower)
+        scores[task_type] = score
+    
+    if not any(scores.values()):
+        return "script"  # 默认类型
+    
+    return max(scores, key=scores.get)
+
+
+# =====================
+# 修复 Prompt 模板
+# =====================
+
+REPAIR_PROMPT_TEMPLATES = {
+    "compile_error": "检测到编译错误。请修复以下问题，专注于解决错误，不要改变其他功能。",
+    "test_failure": "测试失败。请根据 QA 报告中的失败检查和证据，分析问题并修复代码。",
+    "timeout": "命令执行超时。可能原因：代码死循环、等待时间过长或资源耗尽。请优化代码性能或增加超时处理。",
+    "unknown": "验收失败。请分析 QA 报告中的失败原因，理解预期行为与实际行为的差异，然后修复问题。",
+}
+
+
+def build_repair_context(
+    failure_type: str,
+    qa_report: dict,
+    task_data: dict,
+) -> str:
+    """
+    构建修复上下文的提示词
+    
+    Args:
+        failure_type: 失败类型
+        qa_report: QA 报告
+        task_data: 任务数据
+    
+    Returns:
+        修复提示词
+    """
+    template = REPAIR_PROMPT_TEMPLATES.get(failure_type, REPAIR_PROMPT_TEMPLATES["unknown"])
+    
+    context = f"## 修复提示\n{template}\n\n"
+    
+    # 添加失败检查
+    failed_checks = qa_report.get("failed_checks", [])
+    if failed_checks:
+        context += "## 失败的检查\n"
+        for check in failed_checks:
+            context += f"- {check}\n"
+        context += "\n"
+    
+    # 添加证据
+    evidence = qa_report.get("evidence", [])
+    if evidence and isinstance(evidence, list):
+        context += "## 执行证据\n"
+        for ev in evidence:
+            if isinstance(ev, dict):
+                context += f"命令: {ev.get('command', 'N/A')}\n"
+                context += f"退出码: {ev.get('exit_code', 'N/A')}\n"
+                context += f"Stdout: {ev.get('stdout', 'N/A')[:300]}\n"
+                context += f"Stderr: {ev.get('stderr', 'N/A')[:300]}\n\n"
+    
+    # 添加逐条判定结果（如果有）
+    criterion_results = qa_report.get("criterion_results", [])
+    if criterion_results:
+        context += "## 逐条判定结果\n"
+        for result in criterion_results:
+            status = "✅" if result.get("passed") else "❌"
+            context += f"{status} {result.get('criterion', 'N/A')}\n"
+            if result.get("evidence"):
+                context += f"   证据: {result.get('evidence')}\n"
+        context += "\n"
+    
+    # 添加建议修复方向（如果有）
+    suggested_fix = qa_report.get("suggested_fix")
+    if suggested_fix:
+        context += f"## 建议的修复方向\n{suggested_fix}\n\n"
+    
+    return context

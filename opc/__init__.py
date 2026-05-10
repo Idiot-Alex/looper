@@ -11,5 +11,6 @@ from opc.logger import *
 from opc.prompts import *
 from opc.queue import *
 from opc.sandbox import *
+from opc.git_snapshot import *
 
 __version__ = "2.0.0"

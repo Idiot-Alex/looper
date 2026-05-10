@@ -41,8 +41,10 @@ from opc.logger import (
 )
 from opc.prompts import (
     build_manager_prompt, build_engineer_prompt, build_qa_prompt,
+    infer_task_type,
 )
 from opc.config import SESSION_TIMEOUT_SECONDS
+from opc.git_snapshot import create_snapshot
 
 
 def run_manager(status: dict) -> tuple[bool, str]:
@@ -375,6 +377,7 @@ def handle_qa_result(status: dict) -> None:
     session_id = status.get("session_id", "unknown")
     session_dir = get_session_dir(session_id)
     qa_file = session_dir / "qa_report.json"
+    task_file = session_dir / "task.json"
     
     if not qa_file.exists():
         print("❌ qa_report.json 不存在")
@@ -387,6 +390,19 @@ def handle_qa_result(status: dict) -> None:
     if qa_data.get("passed", False):
         status["stage"] = "success"
         print("🎉 任务成功完成！")
+        
+        # 创建成功快照
+        task_goal = ""
+        if task_file.exists():
+            with open(task_file, "r") as f:
+                task_data = json.load(f)
+                task_goal = task_data.get("goal", "")
+        
+        create_snapshot(
+            session_id,
+            f"Task completed: {task_goal}",
+            task_goal,
+        )
     else:
         # 增加重试计数
         increment_retry(status)
@@ -395,9 +411,26 @@ def handle_qa_result(status: dict) -> None:
         if retry_count < MAX_RETRIES:
             status["stage"] = "engineer_retry"
             print(f"🔄 进入重试模式 ({retry_count}/{MAX_RETRIES})")
+            
+            # 记录 failure_type 用于选择修复 prompt
+            failure_type = qa_data.get("failure_type", "unknown")
+            print(f"📋 失败类型: {failure_type}")
         else:
             status["stage"] = "failed"
             print(f"❌ 重试次数超限，任务失败")
+            
+            # 创建失败快照（方便回滚）
+            task_goal = ""
+            if task_file.exists():
+                with open(task_file, "r") as f:
+                    task_data = json.load(f)
+                    task_goal = task_data.get("goal", "")
+            
+            create_snapshot(
+                session_id,
+                f"Task failed after {MAX_RETRIES} retries: {task_goal}",
+                task_goal,
+            )
 
 
 def check_config():
