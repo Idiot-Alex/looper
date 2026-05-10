@@ -1,5 +1,5 @@
 """
-OPC Stage 1 - AI 代码工厂
+OPC - AI 代码工厂
 """
 from opc.config import *
 from opc.state import *
@@ -9,5 +9,6 @@ from opc.writer import *
 from opc.executor import *
 from opc.logger import *
 from opc.prompts import *
+from opc.queue import *
 
-__version__ = "1.0.0"
+__version__ = "2.0.0"

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-OPC Stage 1 Runner 主程序
-状态机驱动，循环执行直到终态
+OPC Runner 主程序
+状态机驱动，支持 Stage 2 队列 + 断点恢复 + 回放保护
 """
 import json
 import sys
@@ -15,7 +15,13 @@ from opc.config import (
 from opc.state import (
     load_status, save_status, init_status,
     increment_retry, increment_parse_retry,
-    is_terminal,
+    is_terminal, mark_stage_completed, is_stage_completed,
+)
+from opc.queue import (
+    migrate_inbox_md, scan_inbox, get_next_task, mark_done,
+    get_task_inbox_path, get_session_dir,
+    is_command_executed, mark_command_executed,
+    is_file_written, mark_file_written,
 )
 from opc.llm import call_manager, call_engineer, call_qa
 from opc.parser import (
@@ -49,12 +55,16 @@ def run_manager(status: dict) -> tuple[bool, str]:
     """
     session_id = status.get("session_id", "unknown")
     
-    # 读取 inbox
-    if not INBOX_FILE.exists():
-        print(f"❌ Inbox 文件不存在: {INBOX_FILE}")
+    # 读取 inbox（Stage 2: 按 session_id 找，Stage 1 兼容: 用 INBOX_FILE）
+    inbox_path = get_task_inbox_path(session_id)
+    if not inbox_path.exists():
+        inbox_path = INBOX_FILE  # Stage 1 兼容
+    
+    if not inbox_path.exists():
+        print(f"❌ Inbox 文件不存在: {inbox_path}")
         return False, "inbox_error"
     
-    inbox_content = INBOX_FILE.read_text(encoding="utf-8")
+    inbox_content = inbox_path.read_text(encoding="utf-8")
     
     # 构建 prompt
     prompt = build_manager_prompt(inbox_content)
@@ -87,11 +97,15 @@ def run_manager(status: dict) -> tuple[bool, str]:
         status["stage"] = "parse_error"
         return False, "validation_error"
     
-    # 保存 task.json
-    task_file = TASKS_DIR / "task.json"
+    # 保存 task.json（Stage 2: session 独立目录）
+    session_dir = get_session_dir(session_id)
+    task_file = session_dir / "task.json"
     task_file.parent.mkdir(parents=True, exist_ok=True)
     with open(task_file, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
+    
+    # 标记 manager 阶段已完成
+    mark_stage_completed(status, "manager")
     
     # 记录会话
     log_session(session_id, "manager_done", {
@@ -120,8 +134,9 @@ def run_engineer(status: dict, is_retry: bool = False) -> tuple[bool, str]:
     session_id = status.get("session_id", "unknown")
     retry_count = status.get("retry_count", 0)
     
-    # 读取 task.json
-    task_file = TASKS_DIR / "task.json"
+    # 读取 task.json（Stage 2: session 独立目录）
+    session_dir = get_session_dir(session_id)
+    task_file = session_dir / "task.json"
     if not task_file.exists():
         print("❌ task.json 不存在")
         return False, "task_error"
@@ -131,7 +146,7 @@ def run_engineer(status: dict, is_retry: bool = False) -> tuple[bool, str]:
     
     # 读取 QA 报告（重试时需要）
     qa_report = None
-    qa_file = TASKS_DIR / "qa_report.json"
+    qa_file = session_dir / "qa_report.json"
     if is_retry and qa_file.exists():
         with open(qa_file, "r", encoding="utf-8") as f:
             qa_report = json.load(f)
@@ -168,18 +183,35 @@ def run_engineer(status: dict, is_retry: bool = False) -> tuple[bool, str]:
         status["stage"] = "parse_error"
         return False, "validation_error"
     
-    # 写入文件
+    # 写入文件（回放保护：跳过已写入文件）
     try:
-        written_files = write_files(PROJECT_ROOT, data.get("files", []))
-        print(f"✅ 写入文件: {', '.join(written_files)}")
+        files_to_write = []
+        for f in data.get("files", []):
+            path = f.get("path", "")
+            if is_file_written(session_id, path):
+                print(f"⏭️ 跳过已写入文件: {path}")
+            else:
+                files_to_write.append(f)
+        
+        written_files = write_files(PROJECT_ROOT, files_to_write) if files_to_write else []
+        
+        # 标记所有文件为已写入（包括之前跳过的）
+        for f in data.get("files", []):
+            mark_file_written(session_id, f.get("path", ""))
+        
+        if written_files:
+            print(f"✅ 写入文件: {', '.join(written_files)}")
     except Exception as e:
         print(f"❌ 文件写入失败: {e}")
         return False, "file_error"
     
-    # 保存 engineer_output.json
-    engineer_file = TASKS_DIR / "engineer_output.json"
+    # 保存 engineer_output.json（Stage 2: session 独立目录）
+    engineer_file = session_dir / "engineer_output.json"
     with open(engineer_file, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
+    
+    # 标记 engineer 阶段已完成
+    mark_stage_completed(status, "engineer")
     
     # 记录会话
     log_session(session_id, "engineer_done", {
@@ -203,8 +235,9 @@ def run_qa(status: dict) -> tuple[bool, str]:
     """
     session_id = status.get("session_id", "unknown")
     
-    # 读取 task.json
-    task_file = TASKS_DIR / "task.json"
+    # 读取 task.json（Stage 2: session 独立目录）
+    session_dir = get_session_dir(session_id)
+    task_file = session_dir / "task.json"
     if not task_file.exists():
         print("❌ task.json 不存在")
         return False, "task_error"
@@ -235,22 +268,31 @@ def run_qa(status: dict) -> tuple[bool, str]:
         except Exception as e:
             print(f"⚠️ 后台启动失败: {e}")
     
-    # 执行 test_commands
+    # 执行 test_commands（回放保护：跳过已执行命令）
     test_commands = task_data.get("test_commands", [])
     if test_commands:
         print(f"🧪 执行测试命令: {len(test_commands)} 个")
         try:
-            results = execute_test_commands(
-                test_commands,
-                session_id,
-                str(PROJECT_ROOT),
-            )
+            results = []
+            for cmd in test_commands:
+                if is_command_executed(session_id, cmd):
+                    print(f"⏭️ 跳过已执行命令: {cmd}")
+                    results.append({
+                        "command": cmd,
+                        "stdout": "(skipped - already executed)",
+                        "stderr": "",
+                        "exit_code": 0,
+                    })
+                else:
+                    result = execute_test_commands([cmd], session_id, str(PROJECT_ROOT))
+                    results.extend(result)
+                    mark_command_executed(session_id, cmd)
             evidence = results
         except Exception as e:
             print(f"❌ 测试执行失败: {e}")
     
-    # 清理后台进程
-    cleanup_background()
+    # 注意：不在这里清理后台进程，等任务完全结束再清理
+    # cleanup_background() 在 run_single_task 返回后由主循环统一处理
     
     if not evidence:
         print("⚠️ 没有执行结果")
@@ -292,10 +334,13 @@ def run_qa(status: dict) -> tuple[bool, str]:
         status["stage"] = "parse_error"
         return False, "validation_error"
     
-    # 保存 qa_report.json
-    qa_file = TASKS_DIR / "qa_report.json"
+    # 保存 qa_report.json（Stage 2: session 独立目录）
+    qa_file = session_dir / "qa_report.json"
     with open(qa_file, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
+    
+    # 标记 qa 阶段已完成
+    mark_stage_completed(status, "qa")
     
     # 记录会话
     log_session(session_id, "qa_done", {
@@ -310,7 +355,9 @@ def run_qa(status: dict) -> tuple[bool, str]:
 
 def handle_qa_result(status: dict) -> None:
     """处理 QA 结果"""
-    qa_file = TASKS_DIR / "qa_report.json"
+    session_id = status.get("session_id", "unknown")
+    session_dir = get_session_dir(session_id)
+    qa_file = session_dir / "qa_report.json"
     
     if not qa_file.exists():
         print("❌ qa_report.json 不存在")
@@ -369,24 +416,17 @@ def check_config():
     return True
 
 
-def main():
-    """主循环"""
-    print("=" * 50)
-    print("OPC Stage 1 Runner")
-    print("=" * 50)
+def run_single_task(session_id: str) -> str:
+    """
+    运行单个任务
     
-    # 检查配置
-    if not check_config():
-        sys.exit(1)
-    
-    # 加载或初始化状态
-    if STATUS_FILE.exists():
-        status = load_status()
-        print(f"📂 恢复会话: {status.get('session_id', 'unknown')}")
-        print(f"📍 当前状态: {status.get('stage', 'inbox')}")
-    else:
-        status = init_status()
-        print(f"🆕 新会话: {status.get('session_id')}")
+    Returns:
+        最终状态 (success/failed/parse_error)
+    """
+    status = load_status(session_id)
+    print(f"📂 恢复会话: {session_id}")
+    print(f"📍 当前状态: {status.get('stage', 'inbox')}")
+    print(f"✅ 已完成阶段: {status.get('completed_stages', [])}")
     
     # 初始化重试计数
     if "api_retry_count" not in status:
@@ -394,7 +434,13 @@ def main():
     if "parse_retry_count" not in status:
         status["parse_retry_count"] = 0
     
-    # 主循环
+    # 初始化重试计数
+    if "api_retry_count" not in status:
+        status["api_retry_count"] = 0
+    if "parse_retry_count" not in status:
+        status["parse_retry_count"] = 0
+    
+    # 主循环（支持 completed_stages 断点恢复）
     while not is_terminal(status.get("stage", "")):
         stage = status.get("stage", "")
         
@@ -422,7 +468,7 @@ def main():
                     if status["api_retry_count"] >= MAX_API_RETRIES:
                         print(f"❌ API 调用失败次数过多 ({status['api_retry_count']}/{MAX_API_RETRIES})，退出")
                         print(f"   错误类型: {error_type}")
-                        save_status(status)
+                        save_status(status, session_id)
                         sys.exit(1)
                     print(f"⚠️ API 调用失败，重试 ({status['api_retry_count']}/{MAX_API_RETRIES})")
             
@@ -448,7 +494,7 @@ def main():
                     if status["api_retry_count"] >= MAX_API_RETRIES:
                         print(f"❌ API 调用失败次数过多 ({status['api_retry_count']}/{MAX_API_RETRIES})，退出")
                         print(f"   错误类型: {error_type}")
-                        save_status(status)
+                        save_status(status, session_id)
                         sys.exit(1)
                     print(f"⚠️ API 调用失败，重试 ({status['api_retry_count']}/{MAX_API_RETRIES})")
             
@@ -470,7 +516,7 @@ def main():
                     if status["api_retry_count"] >= MAX_API_RETRIES:
                         print(f"❌ API 调用失败次数过多 ({status['api_retry_count']}/{MAX_API_RETRIES})，退出")
                         print(f"   错误类型: {error_type}")
-                        save_status(status)
+                        save_status(status, session_id)
                         sys.exit(1)
                     print(f"⚠️ API 调用失败，重试 ({status['api_retry_count']}/{MAX_API_RETRIES})")
             
@@ -484,21 +530,22 @@ def main():
                 break
             
             # 保存状态
-            save_status(status)
+            save_status(status, session_id)
             
             # 检查终态
             if is_terminal(status.get("stage", "")):
+                save_status(status, session_id)  # 显式保存终态
                 break
         
         except KeyboardInterrupt:
             print("\n⚠️ 用户中断")
-            save_status(status)
+            save_status(status, session_id)
             sys.exit(0)
         except Exception as e:
             print(f"❌ 异常: {e}")
             import traceback
             traceback.print_exc()
-            save_status(status)
+            save_status(status, session_id)
             sys.exit(1)
     
     # 最终状态
@@ -508,6 +555,69 @@ def main():
     print(f"{'=' * 50}")
     
     return 0 if final_stage == "success" else 1
+
+
+def main():
+    """队列主循环"""
+    print("=" * 50)
+    print("OPC Runner")
+    print("=" * 50)
+    
+    # 检查配置
+    if not check_config():
+        sys.exit(1)
+    
+    # 迁移 Stage 1 inbox.md 到 inbox/ 目录
+    migrate_inbox_md()
+    
+    # 扫描队列
+    tasks = scan_inbox()
+    if not tasks:
+        print("📭 inbox/ 为空，无待处理任务")
+        sys.exit(0)
+    
+    print(f"📋 发现 {len(tasks)} 个待处理任务（FIFO 顺序）")
+    for i, task in enumerate(tasks, 1):
+        print(f"  {i}. {task['session_id']}")
+    
+    print()
+    
+    # 逐个处理任务
+    results = {}
+    for task in tasks:
+        session_id = task["session_id"]
+        print(f"\n{'#' * 50}")
+        print(f"# 任务 {len(results) + 1}/{len(tasks)}: {session_id}")
+        print(f"{'#' * 50}")
+        
+        # 运行单个任务
+        exit_code = run_single_task(session_id)
+        final_status = load_status(session_id).get("stage", "unknown")
+        results[session_id] = final_status
+        
+        # 任务完成后移动 inbox 文件到 done/
+        mark_done(session_id)
+        
+        # 任务完成后清理后台进程
+        print("🧹 清理后台进程...")
+        cleanup_background()
+        
+        print(f"\n✅ 任务 {session_id} 完成: {final_status}")
+    
+    # 汇总结果
+    print(f"\n{'=' * 50}")
+    print("📊 队列执行汇总")
+    print(f"{'=' * 50}")
+    success_count = sum(1 for v in results.values() if v == "success")
+    failed_count = sum(1 for v in results.values() if v == "failed")
+    error_count = sum(1 for v in results.values() if v == "parse_error")
+    
+    print(f"  成功: {success_count}")
+    print(f"  失败: {failed_count}")
+    print(f"  协议错误: {error_count}")
+    print(f"  总计: {len(results)}")
+    
+    return 0 if success_count == len(results) else 1
 
 
 if __name__ == "__main__":

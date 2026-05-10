@@ -1,5 +1,5 @@
 """
-OPC Stage 1 配置
+OPC 配置
 """
 import os
 from pathlib import Path
@@ -39,9 +39,14 @@ RUNTIME_EXIT_CODE = RUNTIME_DIR / "last_exit_code.txt"
 RUNTIME_COMMAND = RUNTIME_DIR / "last_command.txt"
 RUNTIME_BACKGROUND_PIDS = RUNTIME_DIR / "background_pids.json"
 
-# 状态文件
+# 状态文件（Stage 1 兼容）
 STATUS_FILE = TASKS_DIR / "status.json"
 INBOX_FILE = TASKS_DIR / "inbox.md"
+
+# 队列相关路径（Stage 2）
+INBOX_DIR = TASKS_DIR / "inbox"
+DONE_DIR = TASKS_DIR / "done"
+SESSION_DIR = TASKS_DIR / "{session_id}"  # 每个 session 的独立目录
 
 # LLM 配置
 DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY", "")
