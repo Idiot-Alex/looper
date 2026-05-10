@@ -2,6 +2,8 @@
 
 最小可执行 AI 代码工厂。
 
+*最后更新：2026-05-11*
+
 > 以 Runner 为核心、以 JSON 协议为骨架、以真实执行结果为依据。
 
 ## OPC Stage 1
@@ -18,8 +20,8 @@ uv sync
 cp .env.example .env
 # 编辑 .env 填入你的 DeepSeek 和 MiniMax key
 
-# 3. 写需求
-# 编辑 opc/tasks/inbox.md，描述你要做的事
+# 3. 写需求（放到 inbox/ 目录）
+echo "实现一个 Python HTTP 服务，监听 8080 端口，返回 Hello OPC" > opc/tasks/inbox/001.md
 
 # 4. 运行
 uv run python -m opc.main

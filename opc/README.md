@@ -1,91 +1,57 @@
-# OPC Stage 1 Runner
+# OPC 模块说明
 
-OPC = Operator-Powered Code factory，一个以 Runner 为核心的最小 AI 代码工厂。
+> **主入口文档**：项目根目录 [README.md](../README.md)
+> **规格文档**：[docs/opc_stage1_final_frozen_spec.md](../docs/opc_stage1_final_frozen_spec.md)
 
-## 快速开始
+*最后更新：2026-05-11*
 
-### 1. 安装依赖
-
-```bash
-pip install openai
-```
-
-### 2. 设置环境变量
-
-```bash
-export DEEPSEEK_API_KEY="your-deepseek-api-key"
-export MINIMAX_API_KEY="your-minimax-api-key"
-```
-
-### 3. 编写需求
-
-编辑 `opc/tasks/inbox.md`:
-
-```markdown
-实现一个 Node.js Hello API
-要求：
-- 监听 3000 端口
-- 访问 / 时返回 Hello OPC
-```
-
-### 4. 运行
-
-```bash
-python -m opc.main
-# 或
-python opc/main.py
-```
-
-## 目录结构
+## 模块一览
 
 ```
 opc/
-├── agents/           # 角色定义
-├── tasks/           # 任务状态
-│   ├── inbox.md     # 需求
-│   ├── status.json  # 状态
-│   ├── task.json    # Manager 输出
-│   ├── engineer_output.json  # Engineer 输出
-│   └── qa_report.json       # QA 报告
-├── runtime/         # 执行结果
-├── logs/           # 审计日志
-└── memory/        # 产品记忆
+├── main.py          # 入口 + 状态机主循环
+├── config.py        # 全局配置
+├── state.py         # 状态文件读写
+├── queue.py         # 任务队列管理
+├── llm.py           # LLM 调用封装
+├── parser.py        # JSON 解析（严格 + 兜底）
+├── writer.py        # 安全文件写入
+├── executor.py      # 命令执行（后台 + 端口探测 + 清理）
+├── sandbox.py       # 命令安全沙箱
+├── logger.py        # 日志（文本 + JSONL 结构化）
+├── prompts.py       # Prompt 模板 + 修复策略
+├── metrics.py       # 成本/时延统计
+├── dashboard.py     # HTML 可视化面板
+├── git_snapshot.py  # 本地 Git 快照
+├── agents/          # 角色定义
+├── tasks/           # 任务队列 + 状态
+├── runtime/         # 运行时状态
+├── logs/            # 审计日志
+└── memory/          # 产品记忆
 ```
 
-## 状态流转
-
-```
-inbox
-→ manager_done
-→ engineer_done
-→ qa_done
-→ success ✓
-
-qa_done (失败)
-→ engineer_retry (最多3次)
-→ success ✓ 或 failed ✗
-
-任意阶段 JSON 解析失败
-→ parse_error ⚠️
-```
-
-## API Keys
-
-- **DeepSeek**: 用于 Manager 和 Engineer
-  - 获取: https://platform.deepseek.com/
-  
-- **MiniMax**: 用于 QA
-  - 获取: https://www.minimaxi.com/
-
-## 测试
+## 环境要求
 
 ```bash
-# 正常运行测试
-python -m opc.main
+uv sync  # Python 3.11+, openai, python-dotenv
+```
 
-# 模拟失败测试（注入 bug）
-# 在 inbox.md 中写入不可能完成的需求
+配置 `.env` 文件（参考 `.env.example`）：
+```
+DEEPSEEK_API_KEY=your-key
+MINIMAX_API_KEY=your-key
+```
 
-# 模拟协议失败测试
-# 手动修改 LLM 返回非 JSON 格式
+## 运行
+
+```bash
+# 单任务模式（从 opc/tasks/inbox/ 读取第一个任务）
+uv run python -m opc.main
+
+# 查看统计
+uv run python -c "from opc import get_metrics_summary; print(get_metrics_summary())"
+
+# 生成面板
+uv run python -c "from opc import generate_dashboard; generate_dashboard()"
+# 然后 open opc/logs/dashboard.html
 ```
