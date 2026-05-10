@@ -1,11 +1,15 @@
+"""测试 executor 清理逻辑"""
 import importlib.util
 import sys
 import types
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
 
-def load_executor_module():
+
+def _load_executor_module():
+    """加载 executor 模块（使用 mock 依赖）"""
     fake_config = types.ModuleType("opc.config")
     fake_config.RUNTIME_DIR = Path("/tmp/runtime")
     fake_config.RUNTIME_STDOUT = Path("/tmp/runtime/last_stdout.txt")
@@ -17,21 +21,26 @@ def load_executor_module():
     fake_config.DEFAULT_STARTUP_TIMEOUT = 10
     fake_config.LOGS_COMMAND_RUNS = Path("/tmp/logs/command_runs")
     fake_config.SESSION_TIMEOUT_SECONDS = 900
-    
-    # 注入假 sandbox 模块
+
     fake_sandbox = types.ModuleType("opc.sandbox")
     def _noop(*a, **kw): return True
     fake_sandbox.validate_command = _noop
     fake_sandbox.validate_working_directory = _noop
     fake_sandbox.check_session_timeout = lambda x: False
     fake_sandbox.set_resource_limits = _noop
+    
+    backup = {}
+    for name in ("opc", "opc.config", "opc.sandbox", "opc.executor"):
+        if name in sys.modules:
+            backup[name] = sys.modules[name]
+    
     sys.modules["opc.sandbox"] = fake_sandbox
-
+    
     fake_pkg = types.ModuleType("opc")
-    fake_pkg.__path__ = []  # mark as package
+    fake_pkg.__path__ = []
     sys.modules["opc"] = fake_pkg
     sys.modules["opc.config"] = fake_config
-
+    
     executor_path = Path(__file__).resolve().parents[1] / "opc" / "executor.py"
     spec = importlib.util.spec_from_file_location("opc.executor", executor_path)
     module = importlib.util.module_from_spec(spec)
@@ -39,16 +48,21 @@ def load_executor_module():
     sys.modules["opc.executor"] = module
     setattr(fake_pkg, "executor", module)
     spec.loader.exec_module(module)
-    return module
+    
+    return module, backup
 
 
-executor = load_executor_module()
-from unittest.mock import patch
+@pytest.fixture(scope="function")
+def executor():
+    """每个测试独立加载 executor 模块，测试后恢复"""
+    module, backup = _load_executor_module()
+    yield module
+    # 恢复
+    for name, mod in backup.items():
+        sys.modules[name] = mod
 
-from opc import executor
 
-
-def test_cleanup_background_skips_invalid_pids():
+def test_cleanup_background_skips_invalid_pids(executor):
     with patch.object(executor, "load_background_pids", return_value={"pids": ["x"], "commands": [], "started_at": None}), \
          patch.object(executor, "save_background_pids") as save_mock, \
          patch("builtins.print") as print_mock:
@@ -58,7 +72,7 @@ def test_cleanup_background_skips_invalid_pids():
     print_mock.assert_called_once()
 
 
-def test_cleanup_background_escalates_to_sigkill_when_process_alive():
+def test_cleanup_background_escalates_to_sigkill_when_process_alive(executor):
     pid = 12345
     calls = []
 
