@@ -3,11 +3,13 @@ OPC 命令执行模块
 后台启动 + 端口探测 + 清理
 """
 import json
+import os
+import signal
 import socket
 import subprocess
 import time
 from pathlib import Path
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Any
 
 from opc.config import (
     RUNTIME_DIR, RUNTIME_STDOUT, RUNTIME_STDERR, 
@@ -50,7 +52,7 @@ def run_command(
     cmd: str, 
     timeout: int = DEFAULT_COMMAND_TIMEOUT,
     cwd: Optional[str] = None
-) -> Dict[str, any]:
+) -> Dict[str, Any]:
     """
     执行命令并收集结果
     
@@ -127,25 +129,52 @@ def load_background_pids() -> dict:
 def cleanup_background() -> None:
     """清理后台进程"""
     pids_info = load_background_pids()
+    cleaned = 0
+    skipped = 0
     
     for pid in pids_info.get("pids", []):
+        if not isinstance(pid, int):
+            skipped += 1
+            continue
         try:
-            proc = subprocess.Process(pid)
-            proc.terminate()
-            proc.wait(timeout=3)
-        except subprocess.TimeoutExpired:
+            os.kill(pid, signal.SIGTERM)
+        except ProcessLookupError:
+            skipped += 1
+            continue  # 进程已不存在
+        except PermissionError:
+            skipped += 1
+            continue  # 无权限结束该进程，跳过
+        except OSError:
+            skipped += 1
+            continue  # 其他系统错误，跳过
+
+        # 等待进程退出（最多 3 秒）
+        deadline = time.time() + 3
+        exited = False
+        while time.time() < deadline:
             try:
-                proc.kill()
-            except Exception:
-                pass  # 进程可能已崩溃，静默处理
-        except Exception:
-            pass  # 进程不存在，静默处理
+                os.kill(pid, 0)
+                time.sleep(0.1)
+            except ProcessLookupError:
+                exited = True
+                break
+            except OSError:
+                exited = True
+                break
+        if not exited:
+            try:
+                os.kill(pid, signal.SIGKILL)
+            except OSError:
+                pass  # 进程可能已退出或无权限，静默处理
+        cleaned += 1
     
     # 清空记录
     save_background_pids({"pids": [], "commands": [], "started_at": None})
+    if cleaned or skipped:
+        print(f"🧹 后台清理完成: cleaned={cleaned}, skipped={skipped}")
 
 
-def save_runtime_result(result: Dict[str, any]) -> None:
+def save_runtime_result(result: Dict[str, Any]) -> None:
     """保存执行结果到 runtime 目录"""
     RUNTIME_DIR.mkdir(parents=True, exist_ok=True)
     
@@ -165,7 +194,7 @@ def save_runtime_result(result: Dict[str, any]) -> None:
 def log_command_run(
     session_id: str, 
     stage: str, 
-    result: Dict[str, any],
+    result: Dict[str, Any],
     index: int = 0
 ) -> None:
     """记录命令执行到日志"""
