@@ -1,6 +1,6 @@
 """
 OPC 命令执行模块
-后台启动 + 端口探测 + 清理
+后台启动 + 端口探测 + 清理 + 沙箱集成
 """
 import json
 import os
@@ -15,13 +15,16 @@ from opc.config import (
     RUNTIME_DIR, RUNTIME_STDOUT, RUNTIME_STDERR, 
     RUNTIME_EXIT_CODE, RUNTIME_COMMAND, RUNTIME_BACKGROUND_PIDS,
     DEFAULT_COMMAND_TIMEOUT, DEFAULT_STARTUP_TIMEOUT,
-    LOGS_COMMAND_RUNS,
+    LOGS_COMMAND_RUNS, SESSION_TIMEOUT_SECONDS,
 )
 
 
 class ExecutorError(Exception):
     """执行器异常"""
     pass
+
+
+from opc.sandbox import validate_command, validate_working_directory, check_session_timeout
 
 
 def wait_for_port(port: int, timeout: int = DEFAULT_STARTUP_TIMEOUT) -> bool:
@@ -54,7 +57,7 @@ def run_command(
     cwd: Optional[str] = None
 ) -> Dict[str, Any]:
     """
-    执行命令并收集结果
+    执行命令并收集结果（带沙箱校验）
     
     Args:
         cmd: 命令字符串
@@ -64,6 +67,19 @@ def run_command(
     Returns:
         {"stdout": str, "stderr": str, "exit_code": int, "command": str}
     """
+    # 沙箱校验
+    validate_command(cmd)
+    validate_working_directory(cwd)
+    
+    # 检查 session 超时
+    if check_session_timeout(SESSION_TIMEOUT_SECONDS):
+        return {
+            "stdout": "",
+            "stderr": f"Session 超时（>{SESSION_TIMEOUT_SECONDS}s）",
+            "exit_code": -1,
+            "command": cmd,
+        }
+    
     try:
         result = subprocess.run(
             cmd,
@@ -90,7 +106,7 @@ def run_command(
 
 def start_background_process(cmd: str, cwd: Optional[str] = None) -> subprocess.Popen:
     """
-    启动后台进程
+    启动后台进程（带沙箱校验）
     
     Args:
         cmd: 命令字符串
@@ -99,6 +115,10 @@ def start_background_process(cmd: str, cwd: Optional[str] = None) -> subprocess.
     Returns:
         Popen 对象
     """
+    # 沙箱校验
+    validate_command(cmd)
+    validate_working_directory(cwd)
+    
     proc = subprocess.Popen(
         cmd,
         shell=True,

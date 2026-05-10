@@ -36,11 +36,13 @@ from opc.executor import (
 )
 from opc.logger import (
     log_session, log_prompt, log_raw_output,
-    log_parse_error,
+    log_parse_error, log_event, log_llm_call,
+    log_file_write, log_command_run, log_qa_decision,
 )
 from opc.prompts import (
     build_manager_prompt, build_engineer_prompt, build_qa_prompt,
 )
+from opc.config import SESSION_TIMEOUT_SECONDS
 
 
 def run_manager(status: dict) -> tuple[bool, str]:
@@ -76,8 +78,10 @@ def run_manager(status: dict) -> tuple[bool, str]:
     print("🤖 调用 Manager...")
     try:
         raw_output = call_manager([{"role": "user", "content": prompt}])
+        log_llm_call(session_id, "manager", "deepseek-v4-flash", success=True, stage="manager")
     except Exception as e:
         print(f"❌ Manager 调用失败: {e}")
+        log_llm_call(session_id, "manager", "deepseek-v4-flash", success=False, error=str(e), stage="manager")
         return False, "api_error"
     
     # 记录原始输出
@@ -197,7 +201,9 @@ def run_engineer(status: dict, is_retry: bool = False) -> tuple[bool, str]:
         
         # 标记所有文件为已写入（包括之前跳过的）
         for f in data.get("files", []):
-            mark_file_written(session_id, f.get("path", ""))
+            path = f.get("path", "")
+            mark_file_written(session_id, path)
+            log_file_write(session_id, path, len(f.get("content", "")), skipped=(path not in [ff.get("path") for ff in files_to_write]))
         
         if written_files:
             print(f"✅ 写入文件: {', '.join(written_files)}")
@@ -313,8 +319,10 @@ def run_qa(status: dict) -> tuple[bool, str]:
     print("🤖 调用 QA...")
     try:
         raw_output = call_qa([{"role": "user", "content": prompt}])
+        log_llm_call(session_id, "qa", "MiniMax-M2.5", success=True, stage="qa")
     except Exception as e:
         print(f"❌ QA 调用失败: {e}")
+        log_llm_call(session_id, "qa", "MiniMax-M2.5", success=False, error=str(e), stage="qa")
         return False, "api_error"
     
     # 记录原始输出
@@ -350,6 +358,15 @@ def run_qa(status: dict) -> tuple[bool, str]:
     
     passed = data.get("passed", False)
     print(f"{'✅' if passed else '❌'} QA 判定: {data.get('reason', '')}")
+    
+    # 记录 QA 判定到 JSONL
+    log_qa_decision(
+        session_id,
+        passed,
+        data.get("reason", ""),
+        data.get("failure_type"),
+    )
+    
     return True, ""
 
 
@@ -423,6 +440,12 @@ def run_single_task(session_id: str) -> str:
     Returns:
         最终状态 (success/failed/parse_error)
     """
+    import os
+    import time as time_module
+    
+    # 设置 session 开始时间（用于超时检测）
+    os.environ["OPC_SESSION_START"] = str(time_module.time())
+    
     status = load_status(session_id)
     print(f"📂 恢复会话: {session_id}")
     print(f"📍 当前状态: {status.get('stage', 'inbox')}")

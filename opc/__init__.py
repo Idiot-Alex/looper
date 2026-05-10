@@ -10,5 +10,6 @@ from opc.executor import *
 from opc.logger import *
 from opc.prompts import *
 from opc.queue import *
+from opc.sandbox import *
 
 __version__ = "2.0.0"

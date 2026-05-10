@@ -1,16 +1,172 @@
 """
 OPC 日志模块
-会话、prompts、原始输出记录
+会话、prompts、原始输出记录 + 结构化 JSONL 事件流
 """
 import json
 import time
+import uuid
 from pathlib import Path
 from datetime import datetime
+from typing import Optional, Dict, Any
 
 from opc.config import (
     LOGS_DIR, LOGS_SESSIONS, LOGS_PROMPTS, LOGS_RAW_OUTPUTS,
-    STATUS_FILE,
+    STATUS_FILE, LOGS_JSONL,
 )
+
+
+# =====================
+# 结构化 JSONL 事件流
+# =====================
+
+def log_event(
+    event_type: str,
+    session_id: str,
+    data: Optional[Dict[str, Any]] = None,
+    stage: Optional[str] = None,
+) -> None:
+    """
+    记录结构化事件到 JSONL 文件
+    
+    事件 schema:
+    {
+        "timestamp": "2026-05-10T17:51:00+08:00",
+        "event_type": "llm_call / file_write / command_run / qa_decision / session_timeout",
+        "session_id": "2026-05-10-001",
+        "stage": "manager",
+        "event_id": "uuid",
+        ...data
+    }
+    
+    Args:
+        event_type: 事件类型
+        session_id: 会话 ID
+        data: 事件数据
+        stage: 当前阶段
+    """
+    event = {
+        "timestamp": datetime.now().isoformat(),
+        "event_type": event_type,
+        "session_id": session_id,
+        "event_id": str(uuid.uuid4())[:8],
+    }
+    
+    if stage:
+        event["stage"] = stage
+    
+    if data:
+        event.update(data)
+    
+    # 写入 JSONL
+    LOGS_JSONL.parent.mkdir(parents=True, exist_ok=True)
+    with open(LOGS_JSONL, "a", encoding="utf-8") as f:
+        f.write(json.dumps(event, ensure_ascii=False) + "\n")
+
+
+def log_llm_call(
+    session_id: str,
+    role: str,
+    model: str,
+    tokens_used: Optional[int] = None,
+    duration_ms: Optional[int] = None,
+    success: bool = True,
+    error: Optional[str] = None,
+    stage: Optional[str] = None,
+) -> None:
+    """记录 LLM 调用事件"""
+    log_event(
+        "llm_call",
+        session_id,
+        {
+            "role": role,
+            "model": model,
+            "tokens_used": tokens_used,
+            "duration_ms": duration_ms,
+            "success": success,
+            "error": error,
+        },
+        stage,
+    )
+
+
+def log_file_write(
+    session_id: str,
+    file_path: str,
+    size_bytes: int,
+    skipped: bool = False,
+) -> None:
+    """记录文件写入事件"""
+    log_event(
+        "file_write",
+        session_id,
+        {
+            "file_path": file_path,
+            "size_bytes": size_bytes,
+            "skipped": skipped,
+        },
+    )
+
+
+def log_command_run(
+    session_id: str,
+    command: str,
+    exit_code: int,
+    stdout_preview: Optional[str] = None,
+    stderr_preview: Optional[str] = None,
+    duration_ms: Optional[int] = None,
+    command_type: str = "foreground",  # foreground / background
+) -> None:
+    """记录命令执行事件"""
+    log_event(
+        "command_run",
+        session_id,
+        {
+            "command": command,
+            "exit_code": exit_code,
+            "stdout_preview": (stdout_preview or "")[:200],
+            "stderr_preview": (stderr_preview or "")[:200],
+            "duration_ms": duration_ms,
+            "command_type": command_type,
+        },
+    )
+
+
+def log_qa_decision(
+    session_id: str,
+    passed: bool,
+    reason: str,
+    failure_type: Optional[str] = None,
+) -> None:
+    """记录 QA 判定事件"""
+    log_event(
+        "qa_decision",
+        session_id,
+        {
+            "passed": passed,
+            "reason": reason,
+            "failure_type": failure_type,
+        },
+        "qa",
+    )
+
+
+def log_session_timeout(
+    session_id: str,
+    timeout_seconds: int,
+    elapsed_seconds: int,
+    stage: str,
+) -> None:
+    """记录 Session 超时事件"""
+    log_event(
+        "session_timeout",
+        session_id,
+        {
+            "timeout_seconds": timeout_seconds,
+            "elapsed_seconds": elapsed_seconds,
+            "stage": stage,
+        },
+        stage,
+    )
 
 
 def ensure_log_dirs():

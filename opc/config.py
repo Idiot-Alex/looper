@@ -80,3 +80,17 @@ VALID_STAGES = [
 
 # 终态
 TERMINAL_STAGES = ["success", "failed", "parse_error"]
+
+# Session 全局超时（15分钟）
+SESSION_TIMEOUT_SECONDS = 900
+
+# 命令黑名单（禁止执行）
+FORBIDDEN_COMMANDS = [
+    "sudo", "rm -rf /", "mkfs", "dd if=", 
+]
+
+# 允许的工作目录
+ALLOWED_WORK_DIRS = [PROJECT_ROOT]
+
+# 结构化日志路径
+LOGS_JSONL = LOGS_DIR / "events.jsonl"
