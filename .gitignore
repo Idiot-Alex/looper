@@ -8,6 +8,7 @@ __pycache__/
 venv/
 ENV/
 *.egg-info/
+.pytest_cache/
 
 # IDE
 .idea/
@@ -36,8 +37,8 @@ opc/logs/metrics.json
 opc/logs/dashboard.html
 
 # 队列目录
-opc/tasks/done/      # 已完成任务
-opc/tasks/inbox/*.md  # inbox 中的任务文件由用户管理，不进 git
+opc/tasks/done/
+opc/tasks/inbox/*.md
 
 # Session 独立目录（每个任务的中间状态）
 opc/tasks/20*-*/
