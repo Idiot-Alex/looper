@@ -33,6 +33,9 @@ def load_executor_module():
 
 
 executor = load_executor_module()
+from unittest.mock import patch
+
+from opc import executor
 
 
 def test_cleanup_background_skips_invalid_pids():
