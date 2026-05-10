@@ -12,5 +12,7 @@ from opc.prompts import *
 from opc.queue import *
 from opc.sandbox import *
 from opc.git_snapshot import *
+from opc.metrics import get_metrics_summary, export_metrics
+from opc.dashboard import generate_dashboard, open_dashboard
 
 __version__ = "2.0.0"
