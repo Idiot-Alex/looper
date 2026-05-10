@@ -33,11 +33,13 @@ from opc.writer import write_files
 from opc.executor import (
     execute_background_commands, execute_test_commands,
     cleanup_background, load_background_pids,
+    verify_resources_released,
 )
 from opc.logger import (
     log_session, log_prompt, log_raw_output,
     log_parse_error, log_event, log_llm_call,
     log_file_write, log_command_run, log_qa_decision,
+    log_session_timeout,
 )
 from opc.prompts import (
     build_manager_prompt, build_engineer_prompt, build_qa_prompt,
@@ -255,6 +257,18 @@ def run_qa(status: dict) -> tuple[bool, str]:
     
     # 收集 evidence
     evidence = []
+    
+    # Session 超时检测
+    import time as time_module
+    session_start = float(os.environ.get("OPC_SESSION_START", "0"))
+    elapsed = time_module.time() - session_start if session_start > 0 else 0
+    
+    if elapsed > SESSION_TIMEOUT_SECONDS:
+        print(f"⏰ Session 超时 ({elapsed:.0f}s > {SESSION_TIMEOUT_SECONDS}s)")
+        log_session_timeout(session_id, SESSION_TIMEOUT_SECONDS, int(elapsed), "engineer_done")
+        cleanup_background()
+        status["stage"] = "failed"
+        return False, "timeout"
     
     # 先执行 background_commands
     background_commands = task_data.get("background_commands", [])
@@ -657,6 +671,18 @@ def main():
         # 任务完成后清理后台进程
         print("🧹 清理后台进程...")
         cleanup_background()
+        
+        # 硬校验资源已释放（如果有健康检查端口，确认已释放）
+        ports_to_check = []
+        task_file_path = get_session_dir(session_id) / "task.json"
+        if task_file_path.exists():
+            with open(task_file_path) as f:
+                td = json.load(f)
+                if td.get("health_check_port"):
+                    ports_to_check.append(td["health_check_port"])
+        
+        if not verify_resources_released(ports_to_check if ports_to_check else None):
+            print("⚠️ 资源释放验证失败，但继续处理下一个任务")
         
         print(f"\n✅ 任务 {session_id} 完成: {final_status}")
     

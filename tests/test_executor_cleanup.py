@@ -16,6 +16,16 @@ def load_executor_module():
     fake_config.DEFAULT_COMMAND_TIMEOUT = 30
     fake_config.DEFAULT_STARTUP_TIMEOUT = 10
     fake_config.LOGS_COMMAND_RUNS = Path("/tmp/logs/command_runs")
+    fake_config.SESSION_TIMEOUT_SECONDS = 900
+    
+    # 注入假 sandbox 模块
+    fake_sandbox = types.ModuleType("opc.sandbox")
+    def _noop(*a, **kw): return True
+    fake_sandbox.validate_command = _noop
+    fake_sandbox.validate_working_directory = _noop
+    fake_sandbox.check_session_timeout = lambda x: False
+    fake_sandbox.set_resource_limits = _noop
+    sys.modules["opc.sandbox"] = fake_sandbox
 
     fake_pkg = types.ModuleType("opc")
     fake_pkg.__path__ = []  # mark as package

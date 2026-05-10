@@ -339,3 +339,46 @@ def execute_test_commands(
         log_command_run(session_id, f"test-{i}", result, i)
     
     return results
+
+
+# =====================
+# 资源释放验证
+# =====================
+
+def verify_resources_released(ports: Optional[List[int]] = None) -> bool:
+    """
+    验证端口和资源是否已释放（dequeue 前硬校验）
+    
+    Args:
+        ports: 要检查的端口列表，默认检查 BACKGROUND_PIDS 中记录的
+    
+    Returns:
+        True: 资源已释放，可以安全交接
+        False: 仍有残留
+    """
+    import socket
+    
+    # 如果没指定端口，从 background_pids 推断
+    if ports is None:
+        pids_info = load_background_pids()
+        # 尝试从 pid 检查进程是否还在
+        for pid in pids_info.get("pids", []):
+            try:
+                os.kill(pid, 0)  # 信号 0 只检查进程是否存在
+                print(f"⚠️ 进程 {pid} 仍在运行，资源未释放")
+                return False
+            except OSError:
+                continue
+    
+    # 检查指定端口是否还在监听
+    if ports:
+        for port in ports:
+            try:
+                with socket.create_connection(("localhost", port), timeout=1):
+                    print(f"⚠️ 端口 {port} 仍被占用，资源未释放")
+                    return False
+            except OSError:
+                continue
+    
+    return True
+
