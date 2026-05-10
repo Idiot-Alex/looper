@@ -38,12 +38,14 @@ def create_snapshot(
             print("⚠️ 不是 Git 仓库，跳过快照")
             return False
         
-        # 添加所有变更
+        # 添加变更（排除 runtime 文件）
+        # 只添加代码文件，不添加日志和状态文件
         subprocess.run(
-            ["git", "add", "-A"],
+            ["git", "add", "opc/*.py", "opc/**/*.md"],
             cwd=PROJECT_ROOT,
             check=True,
             capture_output=True,
+            shell=True,
         )
         
         # 检查是否有变更

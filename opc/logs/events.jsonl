@@ -1,4 +1,0 @@
-{"timestamp": "2026-05-10T18:02:25.205727", "event_type": "llm_call", "session_id": "2026-05-10-020", "event_id": "b51684ae", "stage": "manager", "role": "manager", "model": "deepseek-v4-flash", "tokens_used": null, "duration_ms": null, "success": true, "error": null}
-{"timestamp": "2026-05-10T18:02:35.136922", "event_type": "file_write", "session_id": "2026-05-10-020", "event_id": "e0d99a59", "file_path": "server.py", "size_bytes": 634, "skipped": false}
-{"timestamp": "2026-05-10T18:02:38.821669", "event_type": "llm_call", "session_id": "2026-05-10-020", "event_id": "36c25376", "stage": "qa", "role": "qa", "model": "MiniMax-M2.5", "tokens_used": null, "duration_ms": null, "success": true, "error": null}
-{"timestamp": "2026-05-10T18:02:38.822417", "event_type": "qa_decision", "session_id": "2026-05-10-020", "event_id": "993e0647", "stage": "qa", "passed": true, "reason": "curl命令成功返回了'Hello OPC P1'，与验收标准要求完全匹配", "failure_type": null}
