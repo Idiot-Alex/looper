@@ -24,7 +24,7 @@ class ExecutorError(Exception):
     pass
 
 
-from opc.sandbox import validate_command, validate_working_directory, check_session_timeout
+from opc.sandbox import validate_command, validate_working_directory, check_session_timeout, set_resource_limits
 
 
 def wait_for_port(port: int, timeout: int = DEFAULT_STARTUP_TIMEOUT) -> bool:
@@ -88,6 +88,7 @@ def run_command(
             text=True,
             timeout=timeout,
             cwd=cwd,
+            preexec_fn=set_resource_limits,
         )
         return {
             "stdout": result.stdout,
@@ -124,6 +125,7 @@ def start_background_process(cmd: str, cwd: Optional[str] = None) -> subprocess.
         shell=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
+        preexec_fn=set_resource_limits,
         text=True,
         cwd=cwd,
     )

@@ -246,7 +246,17 @@ def build_qa_prompt(
       "exit_code": 退出码
     }
   ],
-  "next_action": "accept/send_back_to_engineer"
+  "next_action": "accept/send_back_to_engineer",
+  "failure_type": "compile_error/test_failure/timeout/unknown",
+  "suggested_fix": "建议修复方向（失败时必填）",
+  "criterion_results": [
+    {
+      "criterion": "验收标准原文",
+      "passed": true/false,
+      "evidence": "对应的运行证据",
+      "risk": "high/medium/low"
+    }
+  ]
 }
 ```
 
