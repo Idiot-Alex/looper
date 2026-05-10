@@ -1,3 +1,38 @@
+import importlib.util
+import sys
+import types
+from pathlib import Path
+from unittest.mock import patch
+
+
+def load_executor_module():
+    fake_config = types.ModuleType("opc.config")
+    fake_config.RUNTIME_DIR = Path("/tmp/runtime")
+    fake_config.RUNTIME_STDOUT = Path("/tmp/runtime/last_stdout.txt")
+    fake_config.RUNTIME_STDERR = Path("/tmp/runtime/last_stderr.txt")
+    fake_config.RUNTIME_EXIT_CODE = Path("/tmp/runtime/last_exit_code.txt")
+    fake_config.RUNTIME_COMMAND = Path("/tmp/runtime/last_command.txt")
+    fake_config.RUNTIME_BACKGROUND_PIDS = Path("/tmp/runtime/background_pids.json")
+    fake_config.DEFAULT_COMMAND_TIMEOUT = 30
+    fake_config.DEFAULT_STARTUP_TIMEOUT = 10
+    fake_config.LOGS_COMMAND_RUNS = Path("/tmp/logs/command_runs")
+
+    fake_pkg = types.ModuleType("opc")
+    fake_pkg.__path__ = []  # mark as package
+    sys.modules["opc"] = fake_pkg
+    sys.modules["opc.config"] = fake_config
+
+    executor_path = Path(__file__).resolve().parents[1] / "opc" / "executor.py"
+    spec = importlib.util.spec_from_file_location("opc.executor", executor_path)
+    module = importlib.util.module_from_spec(spec)
+    assert spec and spec.loader
+    sys.modules["opc.executor"] = module
+    setattr(fake_pkg, "executor", module)
+    spec.loader.exec_module(module)
+    return module
+
+
+executor = load_executor_module()
 from unittest.mock import patch
 
 from opc import executor
