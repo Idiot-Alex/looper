@@ -4,6 +4,7 @@ OPC Runner 主程序
 状态机驱动，支持 Stage 2 队列 + 断点恢复 + 回放保护
 """
 import json
+import os
 import sys
 from pathlib import Path
 

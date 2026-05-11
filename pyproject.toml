@@ -5,6 +5,7 @@ description = "OPC Stage 1 - AI Code Factory"
 readme = "opc/README.md"
 requires-python = ">=3.9"
 dependencies = [
+    "dotenv>=0.9.9",
     "openai>=1.0.0",
     "python-dotenv>=1.2.1",
 ]
