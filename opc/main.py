@@ -127,12 +127,12 @@ def run_manager(status: dict) -> tuple[bool, str]:
 
 def run_engineer(status: dict, is_retry: bool = False) -> tuple[bool, str]:
     """
-    执行 Engineer 阶段
-    
+    执行 Engineer 阶段（支持工具调用循环，Stage 2.5）
+
     Args:
         status: 当前状态
         is_retry: 是否是重试模式
-    
+
     Returns:
         (True, ""): 成功
         (False, "api_error"): API 调用失败
@@ -142,56 +142,113 @@ def run_engineer(status: dict, is_retry: bool = False) -> tuple[bool, str]:
     """
     session_id = status.get("session_id", "unknown")
     retry_count = status.get("retry_count", 0)
-    
+
     # 读取 task.json（Stage 2: session 独立目录）
     session_dir = get_session_dir(session_id)
     task_file = session_dir / "task.json"
     if not task_file.exists():
         print("❌ task.json 不存在")
         return False, "task_error"
-    
+
     with open(task_file, "r", encoding="utf-8") as f:
         task_data = json.load(f)
-    
+
     # 读取 QA 报告（重试时需要）
     qa_report = None
     qa_file = session_dir / "qa_report.json"
     if is_retry and qa_file.exists():
         with open(qa_file, "r", encoding="utf-8") as f:
             qa_report = json.load(f)
-    
-    # 构建 prompt
-    prompt = build_engineer_prompt(task_data, qa_report)
-    
-    # 记录 prompt
-    log_prompt(session_id, "engineer", prompt, retry_count)
-    
-    # 调用 LLM
+
+    # 工具调用循环（Stage 2.5）
+    from opc.tools import get_registry
+
     role_name = "engineer_retry" if is_retry else "engineer"
-    print(f"🤖 调用 Engineer {'(重试模式)' if is_retry else ''}...")
-    try:
-        raw_output = call_engineer([{"role": "user", "content": prompt}])
-    except Exception as e:
-        print(f"❌ Engineer 调用失败: {e}")
-        return False, "api_error"
-    
-    # 记录原始输出
-    log_raw_output(session_id, role_name, raw_output, retry_count)
-    
-    # 解析 JSON
-    data = parse_json_safe(raw_output)
-    if data is None:
-        print("❌ Engineer 输出 JSON 解析失败")
-        log_parse_error(session_id, role_name, raw_output, retry_count)
+    messages = [
+        {"role": "user", "content": build_engineer_prompt(task_data, qa_report)}
+    ]
+    max_tool_calls = 10  # 防止无限循环
+    tool_call_count = 0
+
+    while tool_call_count < max_tool_calls:
+        # 记录 prompt
+        log_prompt(
+            session_id, role_name,
+            messages[-1]["content"],
+            retry_count + tool_call_count
+        )
+
+        # 调用 LLM
+        print(f"🤖 调用 Engineer {'(重试模式)' if is_retry else ''}...")
+        try:
+            raw_output = call_engineer(messages)
+        except Exception as e:
+            print(f"❌ Engineer 调用失败: {e}")
+            return False, "api_error"
+
+        # 记录原始输出
+        log_raw_output(
+            session_id, role_name,
+            raw_output,
+            retry_count + tool_call_count
+        )
+
+        # 解析 JSON
+        data = parse_json_safe(raw_output)
+        if data is None:
+            print("❌ Engineer 输出 JSON 解析失败")
+            log_parse_error(
+                session_id, role_name,
+                raw_output,
+                retry_count + tool_call_count
+            )
+            status["stage"] = "parse_error"
+            return False, "parse_error"
+
+        # 验证格式
+        if not validate_engineer_output(data):
+            print("❌ Engineer 输出格式验证失败")
+            status["stage"] = "parse_error"
+            return False, "validation_error"
+
+        # 检查是否是工具调用
+        if "tool_call" in data:
+            tool_name = data["tool_call"].get("name", "")
+            tool_args = data["tool_call"].get("args", {})
+
+            print(f"🔧 工具调用: {tool_name}({list(tool_args.keys())})")
+
+            # 执行工具
+            registry = get_registry()
+            tool_result = registry.execute(tool_name, tool_args)
+
+            # 打印结果（截断避免太长）
+            if len(tool_result) > 300:
+                print(f"📄 工具结果: {tool_result[:300]}...")
+            else:
+                print(f"📄 工具结果: {tool_result}")
+
+            # 添加到消息历史
+            messages.append({"role": "assistant", "content": raw_output})
+            messages.append({
+                "role": "user",
+                "content": build_engineer_prompt(
+                    task_data, qa_report, tool_result=tool_result
+                ),
+            })
+
+            tool_call_count += 1
+            continue
+
+        # 不是工具调用 → 写入文件
+        break
+
+    # 如果是循环超限
+    if tool_call_count >= max_tool_calls:
+        print(f"❌ 工具调用循环超过 {max_tool_calls} 次仍未输出代码")
         status["stage"] = "parse_error"
         return False, "parse_error"
-    
-    # 验证格式
-    if not validate_engineer_output(data):
-        print("❌ Engineer 输出格式验证失败")
-        status["stage"] = "parse_error"
-        return False, "validation_error"
-    
+
     # 写入文件（回放保护：跳过已写入文件）
     try:
         files_to_write = []
@@ -201,36 +258,43 @@ def run_engineer(status: dict, is_retry: bool = False) -> tuple[bool, str]:
                 print(f"⏭️ 跳过已写入文件: {path}")
             else:
                 files_to_write.append(f)
-        
-        written_files = write_files(PROJECT_ROOT, files_to_write) if files_to_write else []
-        
+
+        written_files = (
+            write_files(PROJECT_ROOT, files_to_write)
+            if files_to_write else []
+        )
+
         # 标记所有文件为已写入（包括之前跳过的）
         for f in data.get("files", []):
             path = f.get("path", "")
             mark_file_written(session_id, path)
-            log_file_write(session_id, path, len(f.get("content", "")), skipped=(path not in [ff.get("path") for ff in files_to_write]))
-        
+            log_file_write(
+                session_id, path, len(f.get("content", "")),
+                skipped=(path not in [ff.get("path") for ff in files_to_write])
+            )
+
         if written_files:
             print(f"✅ 写入文件: {', '.join(written_files)}")
     except Exception as e:
         print(f"❌ 文件写入失败: {e}")
         return False, "file_error"
-    
+
     # 保存 engineer_output.json（Stage 2: session 独立目录）
     engineer_file = session_dir / "engineer_output.json"
     with open(engineer_file, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
-    
+
     # 标记 engineer 阶段已完成
     mark_stage_completed(status, "engineer")
-    
+
     # 记录会话
     log_session(session_id, "engineer_done", {
         "files": written_files,
         "summary": data.get("summary", ""),
+        "tool_calls": tool_call_count,
     })
-    
-    print(f"✅ Engineer 完成")
+
+    print(f"✅ Engineer 完成 (工具调用 {tool_call_count} 次)")
     return True, ""
 
 

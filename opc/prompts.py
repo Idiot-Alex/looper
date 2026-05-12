@@ -100,15 +100,16 @@ def build_engineer_prompt(
     task_json: dict,
     qa_report: Optional[dict] = None,
     project_files: Optional[dict] = None,
+    tool_result: Optional[str] = None,
 ) -> str:
-    """构建 Engineer prompt"""
+    """构建 Engineer prompt（支持工具调用循环）"""
     prompt = f"""# Engineer 角色
 
 你是 OPC 系统的 Engineer，负责根据任务生成代码改动。
 
 ## 重要约束
 1. **你只输出 JSON**，不要输出 markdown
-2. **只给出完整文件内容**，不给 patch/diff
+2. **可以调用工具读取现有文件**
 3. 只能修改项目工作区内文件
 4. 不改需求，不跳过验收标准
 
@@ -118,55 +119,82 @@ def build_engineer_prompt(
 
 **Steps**:
 """
-    
+
     for i, step in enumerate(task_json.get('steps', []), 1):
         prompt += f"{i}. {step}\n"
-    
+
     prompt += "\n**Acceptance Criteria**:\n"
     for criteria in task_json.get('acceptance_criteria', []):
         prompt += f"- {criteria}\n"
-    
+
     if task_json.get('notes'):
         prompt += f"\n**Notes**: {task_json['notes']}\n"
-    
+
+    # 工具说明（Stage 2.5）
+    try:
+        from opc.tools import build_tools_description
+
+        prompt += f"\n{build_tools_description()}\n"
+    except Exception:
+        # 工具系统不可用时降级
+        pass
+
     if project_files:
         prompt += "\n## 当前项目文件\n"
         for path, content in project_files.items():
             prompt += f"\n### {path}\n```\n{content}\n```\n"
-    
+
+    if tool_result:
+        prompt += f"""
+## 工具执行结果
+
+{tool_result}
+
+请继续调用工具读取需要修改的文件，或者输出最终代码。
+"""
+
     if qa_report:
-        # 导入修复上下文构建函数
         from opc.prompts import build_repair_context
-        
+
         prompt += f"""
 ## QA 报告 (上一轮失败原因)
 
 **Passed**: {qa_report.get('passed', False)}
 **Reason**: {qa_report.get('reason', 'N/A')}
 """
-        
-        # 添加修复上下文
+
         if not qa_report.get('passed', False):
             failure_type = qa_report.get('failure_type', 'unknown')
-            repair_context = build_repair_context(failure_type, qa_report, task_json)
+            repair_context = build_repair_context(
+                failure_type, qa_report, task_json
+            )
             prompt += f"\n{repair_context}\n"
         else:
-            # 即使通过了也给出证据供参考
             evidence = qa_report.get('evidence', [])
             if evidence and isinstance(evidence, list):
                 prompt += "\n**Evidence**:\n"
                 for ev in evidence:
                     if isinstance(ev, dict):
                         prompt += f"- Command: {ev.get('command', 'N/A')}\n"
-                        prompt += f"  Stdout: {ev.get('stdout', 'N/A')[:200]}\n"
-                        prompt += f"  Stderr: {ev.get('stderr', 'N/A')[:200]}\n"
+                        prompt += (
+                            f"  Stdout: {ev.get('stdout', 'N/A')[:200]}\n"
+                        )
+                        prompt += (
+                            f"  Stderr: {ev.get('stderr', 'N/A')[:200]}\n"
+                        )
                         prompt += f"  Exit Code: {ev.get('exit_code', 'N/A')}\n"
-    
+
     prompt += """
 ## 输出要求
 
-请输出以下格式的 JSON：
+可以选择以下两种输出格式：
 
+**格式 1: 调用工具**（推荐用于读取现有文件后再修改）
+```json
+{"tool_call": {"name": "read_file", "args": {"path": "src/index.js"}}}
+```
+
+**格式 2: 输出最终代码**（所有工具调用完成后）
 ```json
 {
   "files": [
@@ -179,9 +207,14 @@ def build_engineer_prompt(
 }
 ```
 
+注意：
+- 可以多次调用工具（每次一个）
+- 完成所有读取后，输出最终代码
+- 不要在 tool_call 输出中包含 files
+
 请直接输出 JSON：
 """
-    
+
     return prompt
 
 

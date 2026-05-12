@@ -78,20 +78,36 @@ def validate_manager_output(data: dict) -> bool:
 
 
 def validate_engineer_output(data: dict) -> bool:
-    """验证 Engineer 输出格式"""
+    """
+    验证 Engineer 输出格式
+
+    支持两种格式：
+    - tool_call 格式：{"tool_call": {"name": "...", "args": {...}}}
+    - files 格式：{"files": [{"path": "...", "content": "..."}], "summary": "..."}
+    """
+    # 工具调用格式
+    if "tool_call" in data:
+        if not isinstance(data["tool_call"], dict):
+            return False
+        if "name" not in data["tool_call"]:
+            return False
+        # args 可以是空 dict
+        return True
+
+    # 文件输出格式（原有逻辑）
     if "files" not in data:
         return False
-    
+
     if not isinstance(data.get("files"), list):
         return False
-    
+
     # 每个文件必须有 path 和 content
     for f in data["files"]:
         if not isinstance(f, dict):
             return False
         if "path" not in f or "content" not in f:
             return False
-    
+
     return True
 
 
