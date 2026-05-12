@@ -140,22 +140,22 @@ inbox
 
 从“能跑一次”升级为“可稳定跑多任务”：队列、恢复、沙箱、结构化日志、Git 快照、可视化。
 
-### Stage 2.5（当前阶段 🔴）
+### Stage 2.5（进行中 🔴）
 
-目标：补齐工具化能力，让 Engineer 在已有项目中“先读后改”，并引入人工审批关卡。
+目标：补齐工具化能力，让 Engineer 在已有项目中"先读后改"，并引入人工审批关卡。
 
-P0：
-- Tool/ToolRegistry 抽象
-- `read_file` / `edit_file`
-- `tool_call` 消息循环
-- prompt 升级为“先读后写”
+**P0（已完成 ✅）：**
+- ✅ Tool/ToolRegistry 抽象 (`opc/tools/`)
+- ✅ `read_file` / `edit_file` 实现
+- ✅ `tool_call` 消息循环（最大 10 次/会话）
+- ✅ prompt 升级为"先读后写"
 
-P1：
-- `search_code`
+**P1：**
+- `search_code` 工具
 - QA 可读源码辅助分析
-- `human_gate`
+- `human_gate` 人工审批关卡
 
-P2：
+**P2：**
 - Manager 标记客观/主观需求
 
 ### Stage 3（自主循环）
