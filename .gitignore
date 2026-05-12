@@ -50,6 +50,9 @@ opc/tasks/20*-*/
 !opc/logs/raw_outputs/.gitkeep
 !opc/logs/command_runs/.gitkeep
 
-# OPC generated files
-server.py
-server.py.bak
+# OPC generated files (Engineer output in project root)
+*.py.bak
+hello*.py
+server*.py
+test*.sh
+src/test_*.sh
