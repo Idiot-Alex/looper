@@ -3,6 +3,8 @@ OPC 状态管理 - status.json 读写
 支持 Stage 2 多 session + completed_stages 断点恢复
 """
 import json
+import os
+import tempfile
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
@@ -79,7 +81,7 @@ def load_status(session_id: Optional[str] = None) -> dict:
 
 def save_status(status: dict, session_id: Optional[str] = None) -> None:
     """
-    保存状态文件
+    保存状态文件（原子写入）
     
     Args:
         status: 状态字典
@@ -91,8 +93,20 @@ def save_status(status: dict, session_id: Optional[str] = None) -> None:
         status_file = STATUS_FILE
     
     status_file.parent.mkdir(parents=True, exist_ok=True)
-    with open(status_file, "w", encoding="utf-8") as f:
-        json.dump(status, f, ensure_ascii=False, indent=2)
+    
+    # 原子写入：先写临时文件，再 rename（POSIX 保证原子性）
+    tmp_fd, tmp_path = tempfile.mkstemp(
+        dir=status_file.parent, suffix=".tmp"
+    )
+    try:
+        with os.fdopen(tmp_fd, "w", encoding="utf-8") as f:
+            json.dump(status, f, ensure_ascii=False, indent=2)
+        os.replace(tmp_path, status_file)  # atomic on POSIX
+    except Exception:
+        # 写入失败时清理临时文件
+        if os.path.exists(tmp_path):
+            os.unlink(tmp_path)
+        raise
 
 
 def init_status(session_id: Optional[str] = None) -> dict:

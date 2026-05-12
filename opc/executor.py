@@ -196,6 +196,58 @@ def cleanup_background() -> None:
         print(f"🧹 后台清理完成: cleaned={cleaned}, skipped={skipped}")
 
 
+def cleanup_all_orphans() -> int:
+    """
+    启动时清理所有孤儿后台进程
+    扫描所有 session 目录的 background_pids.json，终止残留进程
+    
+    Returns:
+        清理的进程数量
+    """
+    from opc.config import TASKS_DIR
+    import glob as glob_module
+
+    total_cleaned = 0
+    pid_files = glob_module.glob(str(TASKS_DIR / "*" / "runtime" / "background_pids.json"))
+
+    for pid_file in pid_files:
+        try:
+            with open(pid_file, "r", encoding="utf-8") as f:
+                pids_info = json.load(f)
+        except (json.JSONDecodeError, FileNotFoundError):
+            continue
+
+        for pid in pids_info.get("pids", []):
+            if not isinstance(pid, int):
+                continue
+            try:
+                os.kill(pid, 0)  # 检查进程是否存活
+                # 进程仍在运行，强制终止
+                try:
+                    os.kill(pid, signal.SIGTERM)
+                    time.sleep(1)
+                    try:
+                        os.kill(pid, 0)  # 确认是否已退出
+                        os.kill(pid, signal.SIGKILL)
+                    except ProcessLookupError:
+                        pass
+                except ProcessLookupError:
+                    pass  # 已在 SIGTERM 时退出
+                total_cleaned += 1
+                print(f"  🧹 终止孤儿进程: PID={pid} (from {Path(pid_file).parent.parent.name})")
+            except (ProcessLookupError, PermissionError, OSError):
+                pass  # 进程不存在或无权限，忽略
+
+        # 清空该 session 的 PID 记录
+        try:
+            with open(pid_file, "w", encoding="utf-8") as f:
+                json.dump({"pids": [], "commands": [], "started_at": None}, f)
+        except OSError:
+            pass
+
+    return total_cleaned
+
+
 def save_runtime_result(result: Dict[str, Any]) -> None:
     """保存执行结果到 runtime 目录"""
     RUNTIME_DIR.mkdir(parents=True, exist_ok=True)

@@ -34,7 +34,7 @@ from opc.writer import write_files
 from opc.executor import (
     execute_background_commands, execute_test_commands,
     cleanup_background, load_background_pids,
-    verify_resources_released,
+    verify_resources_released, cleanup_all_orphans,
 )
 from opc.logger import (
     log_session, log_prompt, log_raw_output,
@@ -637,6 +637,11 @@ def main():
     # 检查配置
     if not check_config():
         sys.exit(1)
+    
+    # 启动时清理所有孤儿后台进程
+    orphans = cleanup_all_orphans()
+    if orphans > 0:
+        print(f"🧹 启动时清理了 {orphans} 个孤儿进程")
     
     # 迁移 Stage 1 inbox.md 到 inbox/ 目录
     migrate_inbox_md()
