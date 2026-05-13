@@ -16,22 +16,22 @@ from opc.queue import (
 class TestFIFOQueue:
     """FIFO 队列测试"""
     
-    def test_empty_inbox(self):
+    def test_empty_inbox(self, mock_config):
         """空队列"""
         tasks = scan_inbox()
-        # inbox 里可能有遗留文件，只验证格式
+        # 验证格式
         for t in tasks:
             assert "session_id" in t
             assert "path" in t
     
-    def test_fifo_ordering(self, monkeypatch):
+    def test_fifo_ordering(self, mock_config, monkeypatch):
         """FIFO 按 mtime 排序"""
         from opc.queue import INBOX_DIR
-        
-        # 清空 inbox
+
+        # 清空 mock inbox（不影响真实目录）
         for f in INBOX_DIR.glob("*.md"):
             f.unlink()
-        
+
         # 创建 3 个文件
         files = []
         for i, name in enumerate(["c", "a", "b"]):
@@ -50,10 +50,8 @@ class TestFIFOQueue:
 class TestReplayProtection:
     """回放保护"""
     
-    def test_command_dedup(self, monkeypatch, tmp_path):
-        """命令去重"""
-        # 使用临时目录隔离测试
-        from opc.queue import get_executed_commands_file
+    def test_command_dedup(self, mock_config, monkeypatch):
+        """命令去重（使用 mock_config 隔离到 tmp）"""
         import uuid
         cmd = f"echo {uuid.uuid4().hex}"
         session_id = f"test-{uuid.uuid4().hex[:8]}"
@@ -66,8 +64,8 @@ class TestReplayProtection:
         """不同命令 hash 不同"""
         assert command_hash("echo a") != command_hash("echo b")
     
-    def test_file_write_dedup(self, monkeypatch):
-        """文件写入去重"""
+    def test_file_write_dedup(self, mock_config, monkeypatch):
+        """文件写入去重（使用 mock_config 隔离到 tmp）"""
         import uuid
         path = f"test_file_{uuid.uuid4().hex[:8]}.py"
         session_id = f"test-{uuid.uuid4().hex[:8]}"

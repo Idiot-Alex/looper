@@ -2,9 +2,11 @@
 
 最小可执行 AI 代码工厂。
 
-*最后更新：2026-05-11*
+*最后更新：2026-05-13*
 
 > 以 Runner 为核心、以 JSON 协议为骨架、以真实执行结果为依据。
+
+> 📌 **战略总览**：本文档聚焦快速上手与架构概览。完整定位、差异化分析、发展路线见 [docs/looper_positioning_and_roadmap.md](docs/looper_positioning_and_roadmap.md)（Stage 2.5 进行中）
 
 ## OPC Stage 1
 
@@ -98,8 +100,9 @@ looper/
 ```
 inbox
   → manager_done
-    → engineer_done
+    → engineer_done (tool_call 循环: read_file / edit_file / search_code)
       → qa_done → success    ✅
+      → qa_done → human_review → 🚦 人工审批 → success / failed
 
 qa_done (失败)
   → engineer_retry (最多 3 次) → success / failed ❌

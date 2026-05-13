@@ -190,25 +190,51 @@ inbox
 
 ---
 
-## 七、当前状态与待办
+## 七、当前已落地 vs 规划中
 
-### 已完成（Stage 2）
+### Stage 1 ✅
 
-- 队列化（inbox/ + FIFO）
-- 独立 session 状态 + 断点恢复
-- 回放保护（命令/文件去重）
-- 沙箱强化（黑名单 + 资源限制 + session 超时）
-- 资源释放验证（dequeue 前校验）
-- JSONL 审计事件流
-- Git 快照与回滚
-- QA 可解释性（`failure_type` + `criterion_results`）
-- 成本统计与 HTML 面板
-- 回归测试
+| 能力 | 落地文件 | 状态 |
+|------|---------|------|
+| Manager 拆解任务 | `opc/llm.py`, `opc/prompts.py` | ✅ |
+| Engineer 写代码 | `opc/main.py` | ✅ |
+| QA 独立审计 | `opc/main.py` | ✅ |
+| JSON 协议驱动 | `opc/parser.py` | ✅ |
+| 安全文件写入 | `opc/writer.py` | ✅ |
 
-### 待修复（P0）
+### Stage 2 ✅
 
-- `status.json` 原子写入
-- 启动时清理孤儿进程
+| 能力 | 落地文件 | 状态 |
+|------|---------|------|
+| 队列化（inbox/ + FIFO） | `opc/queue.py` | ✅ |
+| 独立 session 状态 + 断点恢复 | `opc/state.py` | ✅ |
+| 回放保护（命令/文件去重） | `opc/queue.py` | ✅ |
+| 沙箱强化（黑名单 + 资源限制 + session 超时） | `opc/sandbox.py`, `opc/executor.py` | ✅ |
+| 资源释放验证（dequeue 前校验） | `opc/executor.py` | ✅ |
+| JSONL 审计事件流 | `opc/logger.py` | ✅ |
+| Git 快照与回滚 | `opc/git_snapshot.py` | ✅ |
+| QA 可解释性（`failure_type` + `criterion_results`） | `opc/prompts.py` | ✅ |
+| 成本统计与 HTML 面板 | `opc/metrics.py`, `opc/dashboard.py` | ✅ |
+| `status.json` 原子写入 | `opc/state.py` | ✅ |
+| 启动时清理孤儿进程 | `opc/executor.py`, `opc/main.py` | ✅ |
+
+### Stage 2.5 🔴（进行中）
+
+| 能力 | 落地文件 | 状态 | 备注 |
+|------|---------|------|------|
+| Tool/ToolRegistry 抽象 | `opc/tools/__init__.py` | ✅ | 单例注册模式 |
+| `read_file` 工具 | `opc/tools/file_tools.py` | ✅ | 3000 行截断 |
+| `edit_file` 工具 | `opc/tools/file_tools.py` | ✅ | 备份自动生成 |
+| `search_code` 工具 | `opc/tools/search_tools.py` | ✅ | 正则+上下文 |
+| `list_files` 工具 | `opc/tools/search_tools.py` | ✅ | 目录树 |
+| `tool_call` 消息循环 | `opc/main.py` | ✅ | 最多 10 次/会话 |
+| Engineer prompt 升级 | `opc/prompts.py` | ✅ | 含工具说明 |
+| QA 读源码辅助分析 | `opc/prompts.py`, `opc/main.py` | ✅ | 传入 source_code |
+| `human_gate` 人工审批关卡 | `opc/main.py` | ✅ | y/n/r 三选一 |
+| `needs_human_review` 字段 | `opc/prompts.py` | ✅ | QA 输出格式 |
+| Manager 标记客观/主观需求 | — | ⏳ P2 | |
+
+> P0 bug 已全部修完：原子写入 ✅、孤儿清理 ✅、git snapshot 路径 ✅
 
 ---
 
