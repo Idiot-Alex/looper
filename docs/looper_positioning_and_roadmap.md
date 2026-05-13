@@ -150,10 +150,10 @@ inbox
 - ✅ `tool_call` 消息循环（最大 10 次/会话）
 - ✅ prompt 升级为"先读后写"
 
-**P1：**
-- `search_code` 工具
-- QA 可读源码辅助分析
-- `human_gate` 人工审批关卡
+**P1（已完成 ✅）：**
+- ✅ `search_code` + `list_files` 工具
+- ✅ QA 可读 Engineer 源码辅助分析
+- ✅ `human_gate` 人工审批关卡
 
 **P2：**
 - Manager 标记客观/主观需求
