@@ -30,7 +30,18 @@ echo "实现一个 Python HTTP 服务，监听 8080 端口，返回 Hello OPC" >
 
 # 4. 运行
 uv run python -m opc.main
+
+# 5. 验证环境健康（首次运行前建议执行）
+uv run pytest tests/ -q && uv run python3 scripts/check_doc_consistency.py
 ```
+
+### 开发者下一步
+
+遇到问题或想了解当前进度？先看：
+
+1. **短期执行手册** → [`docs/sprint_guide.md`](docs/sprint_guide.md)（能力→测试→命令映射）
+2. **战略总览** → [`docs/looper_positioning_and_roadmap.md`](docs/looper_positioning_and_roadmap.md)（定位、差异化、路线图）
+3. **Stage 2 细则** → [`docs/stage2_next_phase_plan.md`](docs/stage2_next_phase_plan.md)（历史冻结文档）
 
 ### 运行示例
 
