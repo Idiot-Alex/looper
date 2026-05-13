@@ -14,6 +14,9 @@
 
 ### 快速开始
 
+> 运行环境：最低支持 **Python 3.9**（`pyproject.toml`），推荐使用 **Python 3.11** 进行本地开发。
+
+
 ```bash
 # 1. 安装依赖
 uv sync
@@ -82,7 +85,6 @@ looper/
 │   └── memory/       # 产品记忆
 ├── docs/             # 规格文档
 ├── pyproject.toml    # uv 项目配置
-├── .python-version   # Python 3.11
 └── .env.example      # 环境变量模板
 ```
 
