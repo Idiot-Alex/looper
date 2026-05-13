@@ -62,9 +62,12 @@ class ToolRegistry:
     def _register_default_tools(self) -> None:
         """Register built-in tools"""
         from opc.tools.file_tools import ReadFileTool, EditFileTool
+        from opc.tools.search_tools import SearchCodeTool, ListFilesTool
 
         self.register(ReadFileTool())
         self.register(EditFileTool())
+        self.register(SearchCodeTool())
+        self.register(ListFilesTool())
 
     def register(self, tool: Tool) -> None:
         """Register a tool"""

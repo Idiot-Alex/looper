@@ -221,8 +221,9 @@ def build_engineer_prompt(
 def build_qa_prompt(
     task_json: dict,
     evidence: list,
+    source_code: Optional[dict] = None,
 ) -> str:
-    """构建 QA prompt"""
+    """构建 QA prompt（支持源码上下文）"""
     prompt = f"""# QA 角色
 
 你是 OPC 系统的 QA，负责判断执行结果是否满足验收标准。
@@ -230,8 +231,9 @@ def build_qa_prompt(
 ## 重要约束
 1. **你不会执行命令**
 2. **你会收到实际命令输出**
-3. **你只根据验收标准和执行结果做判断**
-4. **你只输出 JSON**
+3. **你会收到 Engineer 写的源码作为参考**
+4. **你只根据验收标准和执行结果做判断**
+5. **你只输出 JSON**
 
 ## 当前任务
 
@@ -239,10 +241,10 @@ def build_qa_prompt(
 
 **Acceptance Criteria**:
 """
-    
+
     for i, criteria in enumerate(task_json.get('acceptance_criteria', []), 1):
         prompt += f"{i}. {criteria}\n"
-    
+
     prompt += """
 ## 实际执行结果 (Evidence)
 
@@ -260,7 +262,16 @@ def build_qa_prompt(
         prompt += f"- Exit Code: {evidence.get('exit_code', 'N/A')}\n"
         prompt += f"- Stdout: {evidence.get('stdout', 'N/A')[:500]}\n"
         prompt += f"- Stderr: {evidence.get('stderr', 'N/A')[:500]}\n"
-    
+
+    # 源码上下文（Stage 2.5 P1: QA 可读源码辅助分析）
+    if source_code:
+        prompt += "\n## Engineer 写的源码（供参考）\n\n"
+        for path, content in source_code.items():
+            truncated = content[:1500] if len(content) > 1500 else content
+            if len(content) > 1500:
+                truncated += f"\n... [truncated, {len(content)} total chars]"
+            prompt += f"### {path}\n```\n{truncated}\n```\n\n"
+
     prompt += """
 ## 输出要求
 
@@ -281,6 +292,7 @@ def build_qa_prompt(
   ],
   "next_action": "accept/send_back_to_engineer",
   "failure_type": "compile_error/test_failure/timeout/unknown",
+  "needs_human_review": false,
   "suggested_fix": "建议修复方向（失败时必填）",
   "criterion_results": [
     {
@@ -294,6 +306,8 @@ def build_qa_prompt(
 ```
 
 **注意**：`evidence` 必须包含每条 `test_command` 的执行结果。
+
+**关于 `needs_human_review`**：如果任务涉及主观判断（如 UI 美观、文案质量、架构选择），且你无法仅凭客观标准判定，请设置 `needs_human_review: true`，系统将暂停等待人工审批。
 
 请直接输出 JSON：
 """

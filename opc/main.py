@@ -389,9 +389,26 @@ def run_qa(status: dict) -> tuple[bool, str]:
             "stderr": "无执行结果",
             "exit_code": -1,
         }]
-    
-    # 构建 QA prompt
-    prompt = build_qa_prompt(task_data, evidence)
+
+    # 加载 Engineer 写的源码给 QA 参考（Stage 2.5 P1）
+    source_code = None
+    engineer_file = session_dir / "engineer_output.json"
+    if engineer_file.exists():
+        try:
+            with open(engineer_file, "r", encoding="utf-8") as f:
+                engineer_data = json.load(f)
+            files = engineer_data.get("files", [])
+            if files:
+                source_code = {
+                    f["path"]: f["content"]
+                    for f in files
+                    if f.get("path") and f.get("content")
+                }
+        except Exception:
+            pass  # 源码不可用时继续
+
+    # 构建 QA prompt（带源码上下文）
+    prompt = build_qa_prompt(task_data, evidence, source_code)
     
     # 记录 prompt
     log_prompt(session_id, "qa", prompt, 0)
@@ -467,6 +484,12 @@ def handle_qa_result(status: dict) -> None:
         qa_data = json.load(f)
     
     if qa_data.get("passed", False):
+        # 检查是否需要人工审批（human_gate）
+        if qa_data.get("needs_human_review", False):
+            status["stage"] = "human_review"
+            print("🚦 QA 通过，但需要人工审批（human_gate）")
+            return
+
         status["stage"] = "success"
         print("🎉 任务成功完成！")
         
@@ -659,6 +682,69 @@ def run_single_task(session_id: str) -> str:
                 handle_qa_result(status)
                 status["api_retry_count"] = 0
                 status["parse_retry_count"] = 0
+
+            elif stage == "human_review":
+                # human_gate: 等待人工审批
+                session_id = status.get("session_id", "unknown")
+                session_dir = get_session_dir(session_id)
+                qa_file = session_dir / "qa_report.json"
+                task_file = session_dir / "task.json"
+
+                print("\n" + "=" * 50)
+                print("🚦 HUMAN GATE — 需要人工审批")
+                print("=" * 50)
+
+                if qa_file.exists():
+                    with open(qa_file, "r") as f:
+                        qa_data = json.load(f)
+                    print(f"\nQA 判定: {qa_data.get('passed', False)}")
+                    print(f"理由: {qa_data.get('reason', 'N/A')[:200]}")
+                    print(f"变更摘要: {qa_data.get('summary', 'N/A')}")
+
+                if task_file.exists():
+                    with open(task_file, "r") as f:
+                        task_data = json.load(f)
+                    print(f"\n任务目标: {task_data.get('goal', 'N/A')}")
+
+                print("\n请确认是否接受当前结果:")
+                print("  输入 [y/yes] 接受 → success")
+                print("  输入 [n/no] 拒绝 → failed")
+                print("  输入 [r/retry] 重试 → engineer_retry")
+                print(f"  (超时 {60} 秒，自动拒绝)")
+                print("> ", end="", flush=True)
+
+                try:
+                    import select
+                    import sys
+                    rlist, _, _ = select.select([sys.stdin], [], [], 60)
+                    if rlist:
+                        user_input = sys.stdin.readline().strip().lower()
+                    else:
+                        print("⏰ 超时，自动拒绝")
+                        user_input = "n"
+                except Exception:
+                    # Windows 或非 tty 环境fallback
+                    print("(无法读取输入，尝试 tty)")
+                    try:
+                        user_input = input("> ").strip().lower()
+                    except (EOFError, KeyboardInterrupt):
+                        user_input = "n"
+
+                if user_input in ("y", "yes"):
+                    status["stage"] = "success"
+                    print("✅ 人工审批通过")
+                    task_goal = ""
+                    if task_file.exists():
+                        with open(task_file, "r") as f:
+                            task_data = json.load(f)
+                            task_goal = task_data.get("goal", "")
+                    create_snapshot(session_id, f"Task completed (human approved): {task_goal}", task_goal)
+                elif user_input in ("r", "retry"):
+                    status["stage"] = "engineer_retry"
+                    print("🔄 人工要求重试")
+                else:
+                    status["stage"] = "failed"
+                    print("❌ 人工审批拒绝")
             
             else:
                 print(f"❌ 未知状态: {stage}")
