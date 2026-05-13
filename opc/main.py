@@ -229,14 +229,15 @@ def run_engineer(status: dict, is_retry: bool = False) -> tuple[bool, str]:
                 print(f"📄 工具结果: {tool_result}")
 
             # 添加到消息历史
-            # tool_result 后的 prompt 不带 qa_report（避免重复），只给结果上下文
+            # tool_result 后要明确告知输出 files 格式，不要再调用工具
             messages.append({"role": "assistant", "content": raw_output})
-            messages.append({
-                "role": "user",
-                "content": build_engineer_prompt(
-                    task_data, qa_report=None, tool_result=tool_result
-                ),
-            })
+            continuation = (
+                f"工具执行结果：\n{tool_result}\n\n"
+                "请根据上述结果输出修复后的代码，格式如下：\n"
+                '{"files": [{"path": "xxx", "content": "..."}], "summary": "..."}\n\n'
+                "不要再次调用工具，直接输出 JSON。"
+            )
+            messages.append({"role": "user", "content": continuation})
 
             tool_call_count += 1
             continue
