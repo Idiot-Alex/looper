@@ -2,7 +2,9 @@
 
 *最后更新：2026-05-13*
 
-> 📌 **文档关系**：本文档是战略总览。Stage 2 细节以 `docs/stage2_next_phase_plan.md` 为准，避免双文档漂移。
+> 📌 **文档关系**：本文档是战略总览。Stage 2 细则以 [`docs/stage2_next_phase_plan.md`](docs/stage2_next_phase_plan.md) 为准，避免双文档漂移。
+
+> ⚠️ **状态边界提示**：本文档记录路线图目标。**当前未落地项以 GitHub Issue / Pull Request 为准**，文档可能在实现前更新，不代表代码已支持。
 
 ---
 
@@ -145,6 +147,8 @@ inbox
 ### Stage 2.5（进行中 🔴）
 
 目标：补齐工具化能力，让 Engineer 在已有项目中"先读后改"，并引入人工审批关卡。
+
+> ⚠️ **P2 未落地项**：Manager 标记客观/主观需求尚未实现，以实际 PR 为准。
 
 **P0（已完成 ✅）：**
 - ✅ Tool/ToolRegistry 抽象 (`opc/tools/`)
