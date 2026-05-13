@@ -229,11 +229,12 @@ def run_engineer(status: dict, is_retry: bool = False) -> tuple[bool, str]:
                 print(f"📄 工具结果: {tool_result}")
 
             # 添加到消息历史
+            # tool_result 后的 prompt 不带 qa_report（避免重复），只给结果上下文
             messages.append({"role": "assistant", "content": raw_output})
             messages.append({
                 "role": "user",
                 "content": build_engineer_prompt(
-                    task_data, qa_report, tool_result=tool_result
+                    task_data, qa_report=None, tool_result=tool_result
                 ),
             })
 

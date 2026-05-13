@@ -4,6 +4,7 @@ OPC 命令执行模块
 """
 import json
 import os
+import shlex
 import signal
 import socket
 import subprocess
@@ -81,9 +82,10 @@ def run_command(
         }
     
     try:
+        # shell=False 防止 * 等通配符被 shell 展开
         result = subprocess.run(
-            cmd,
-            shell=True,
+            shlex.split(cmd),
+            shell=False,
             capture_output=True,
             text=True,
             timeout=timeout,
@@ -119,9 +121,14 @@ def start_background_process(cmd: str, cwd: Optional[str] = None) -> subprocess.
     # 沙箱校验
     validate_command(cmd)
     validate_working_directory(cwd)
-    
+
+    # 去掉尾部的 &（subprocess.Popen 本身就是后台运行，不需要 shell &）
+    clean_cmd = cmd.rstrip()
+    if clean_cmd.endswith("&"):
+        clean_cmd = clean_cmd[:-1].rstrip()
+
     proc = subprocess.Popen(
-        cmd,
+        clean_cmd,
         shell=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
@@ -367,7 +374,7 @@ def execute_test_commands(
     cwd: Optional[str] = None
 ) -> List[Dict[str, any]]:
     """
-    执行测试命令列表
+    执行测试命令列表（禁用 shell expansion，防止 * 等通配符展开）
     
     Args:
         commands: 命令列表
@@ -380,7 +387,7 @@ def execute_test_commands(
     results = []
     
     for i, cmd in enumerate(commands):
-        result = run_command(cmd, cwd=cwd)
+        result = _run_command_no_expand(cmd, cwd=cwd)
         results.append(result)
         
         # 如果是最后一条命令，保存到 runtime
@@ -391,6 +398,57 @@ def execute_test_commands(
         log_command_run(session_id, f"test-{i}", result, i)
     
     return results
+
+
+def _run_command_no_expand(
+    cmd: str,
+    timeout: int = DEFAULT_COMMAND_TIMEOUT,
+    cwd: Optional[str] = None
+) -> Dict[str, Any]:
+    """
+    执行命令（禁用 shell expansion，防止 * 等通配符被展开）
+    仅用于测试命令，不支持管道/重定向等 shell 特性
+    """
+    validate_command(cmd)
+    validate_working_directory(cwd)
+
+    if check_session_timeout(SESSION_TIMEOUT_SECONDS):
+        return {
+            "stdout": "",
+            "stderr": f"Session 超时（>{SESSION_TIMEOUT_SECONDS}s）",
+            "exit_code": -1,
+            "command": cmd,
+        }
+
+    try:
+        result = subprocess.run(
+            shlex.split(cmd),
+            shell=False,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            cwd=cwd,
+        )
+        return {
+            "stdout": result.stdout,
+            "stderr": result.stderr,
+            "exit_code": result.returncode,
+            "command": cmd,
+        }
+    except subprocess.TimeoutExpired:
+        return {
+            "stdout": "",
+            "stderr": f"命令超时（>{timeout}s）",
+            "exit_code": -1,
+            "command": cmd,
+        }
+    except OSError as e:
+        return {
+            "stdout": "",
+            "stderr": f"命令执行失败: {e}",
+            "exit_code": -1,
+            "command": cmd,
+        }
 
 
 # =====================
