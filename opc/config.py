@@ -73,16 +73,22 @@ VALID_STAGES = [
     "engineer_done",
     "engineer_retry",
     "qa_done",
+    "human_review",
     "success",
     "failed",
     "parse_error",
 ]
 
-# 终态
+# 终态（human_review 不是终态，审批后才转 success/failed）
 TERMINAL_STAGES = ["success", "failed", "parse_error"]
 
 # Session 全局超时（15分钟）
 SESSION_TIMEOUT_SECONDS = 900
+
+# 队列严格模式：资源释放失败时是否中断队列
+# True = 严格模式，任一任务资源未释放则停止队列
+# False = 宽松模式，仅告警但不中断（默认）
+STRICT_QUEUE_MODE = False
 
 # 命令黑名单（禁止执行）
 FORBIDDEN_COMMANDS = [

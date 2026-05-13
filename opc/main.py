@@ -838,7 +838,12 @@ def main():
                     ports_to_check.append(td["health_check_port"])
         
         if not verify_resources_released(ports_to_check if ports_to_check else None):
-            print("⚠️ 资源释放验证失败，但继续处理下一个任务")
+            from opc.config import STRICT_QUEUE_MODE
+            if STRICT_QUEUE_MODE:
+                print("❌ 严格模式：资源释放验证失败，停止队列")
+                break
+            else:
+                print("⚠️ 资源释放验证失败，继续处理下一个任务（设置 STRICT_QUEUE_MODE=True 可改为中断）")
         
         print(f"\n✅ 任务 {session_id} 完成: {final_status}")
     
