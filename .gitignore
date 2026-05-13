@@ -42,6 +42,7 @@ opc/tasks/inbox/*.md
 
 # Session 独立目录（每个任务的中间状态）
 opc/tasks/20*-*/
+opc/tasks/test-*/
 
 # 保留目录结构
 !opc/runtime/.gitkeep
