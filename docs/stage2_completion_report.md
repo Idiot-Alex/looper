@@ -88,6 +88,15 @@ Git 快照: 74f59b0
 任务: 实现一个 Python 脚本 reverse.py（读取标准输入倒序输出）
 会话: 2026-05-14-004
 结果: ✅ success
+关键链路:
+  1. Manager 拆解任务
+  2. Engineer 写入 reverse.py
+  3. QA 第一次判定失败（字符串倒序逻辑有误）→ retry (1/3)
+  4. Engineer retry 时调用 read_file 工具读取现有代码（✅ 工具链生效）
+  5. 读取结果 → 直接输出修复后的 files JSON（✅ parse_error 已修）
+  6. QA 第二次判定通过
+  7. Git 快照创建
+Git 快照: deb78aa
 ```
 
 ---
