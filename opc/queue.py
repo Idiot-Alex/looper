@@ -8,7 +8,7 @@ import shutil
 from pathlib import Path
 from typing import List, Optional, Dict
 
-from opc.config import INBOX_DIR, DONE_DIR, TASKS_DIR
+from opc.config import INBOX_DIR, DONE_DIR, TASKS_DIR, INBOX_FILE
 
 
 def ensure_dirs():
