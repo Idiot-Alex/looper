@@ -190,7 +190,7 @@ inbox
 - `edit_file`
 - `run_command`
 - `search_code`
-- `get_file_tree`
+- `list_files`
 
 ---
 

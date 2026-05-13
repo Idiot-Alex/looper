@@ -246,8 +246,8 @@ def run_engineer(status: dict, is_retry: bool = False) -> tuple[bool, str]:
     # 如果是循环超限
     if tool_call_count >= max_tool_calls:
         print(f"❌ 工具调用循环超过 {max_tool_calls} 次仍未输出代码")
-        status["stage"] = "parse_error"
-        return False, "parse_error"
+        status["stage"] = "failed"
+        return False, "tool_loop_exceeded"
 
     # 写入文件（回放保护：跳过已写入文件）
     try:
@@ -647,6 +647,16 @@ def run_single_task(session_id: str) -> str:
                         status["stage"] = "parse_error"
                     else:
                         print(f"⚠️ Engineer JSON 解析失败，重试 (1/1)")
+                elif error_type == "tool_loop_exceeded":
+                    # tool_loop_exceeded 不重试，直接标记失败
+                    increment_retry(status)
+                    retry_count = status.get("retry_count", 0)
+                    if retry_count >= MAX_RETRIES:
+                        print(f"❌ 工具调用循环超限，进入 failed")
+                        status["stage"] = "failed"
+                    else:
+                        print(f"🔄 工具调用循环超限，重试 ({retry_count}/{MAX_RETRIES})")
+                        status["stage"] = "engineer_retry"
                 else:
                     status["api_retry_count"] += 1
                     if status["api_retry_count"] >= MAX_API_RETRIES:

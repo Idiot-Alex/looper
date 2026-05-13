@@ -19,7 +19,7 @@ MAX_FILE_SIZE = 1024 * 1024  # 跳过大于 1MB 的文件
 EXCLUDE_PATTERNS = {
     "__pycache__", ".git", ".pytest_cache", ".venv",
     "node_modules", ".DS_Store",
-    "*.pyc", "*.pyo", "*.so", "*.egg-info",
+    "*.pyc", "*.pyo", "*.so", "*.egg-info", "*.bak",
     "opc/tasks", "opc/logs", "opc/runtime",
     "hello*.py", "server*.py", "test*.sh",
 }
@@ -129,6 +129,8 @@ class SearchCodeTool(Tool):
 
         # 收集匹配文件
         total_matches = 0
+        files_scanned = 0
+        files_with_matches = 0
         file_results: List[str] = []
 
         for path in PROJECT_ROOT.rglob("*"):
@@ -139,9 +141,12 @@ class SearchCodeTool(Tool):
             if extensions and path.suffix not in extensions:
                 continue
 
+            files_scanned += 1
             matches = _search_file(path, pattern, is_regex)
             if not matches:
                 continue
+
+            files_with_matches += 1
 
             # 找到匹配，生成输出
             rel_path = path.relative_to(PROJECT_ROOT)
@@ -162,14 +167,15 @@ class SearchCodeTool(Tool):
                 file_results.append(f"  ... and {len(matches) - 10} more matches\n")
 
         if total_matches == 0:
-            return f"No matches found for '{pattern}'"
+            return f"No matches found for '{pattern}' in {files_scanned} scanned files"
 
         # 截断（防止太长）
         result = "".join(file_results)
         if len(result) > 8000:
             result = result[:8000] + f"\n... [truncated, {total_matches} total matches]"
 
-        result += f"\n=== Total: {total_matches} matches ==="
+        hit_rate = f"{total_matches}/{files_scanned}" if files_scanned else "0"
+        result += f"\n=== Stats: {total_matches} matches in {files_with_matches} files, scanned {files_scanned} files (hit rate {hit_rate}) ==="
         return result
 
 

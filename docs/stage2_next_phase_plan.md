@@ -1,6 +1,8 @@
 # OPC 下一阶段建议（Stage 2 规划冻结版）
 
-*最后更新：2026-05-11*
+*最后更新：2026-05-11（已冻结）*
+
+> ⚠️ **历史冻结文档**：本文档记录 Stage 2 规划决策。**当前以 [`docs/looper_positioning_and_roadmap.md`](looper_positioning_and_roadmap.md) 为战略总览**，本文档仅作历史参考。
 
 基于 `docs/opc_stage1_final_frozen_spec.md`，Stage 1 已经明确聚焦在单机闭环与可审计执行。下一阶段建议目标不是“加更多角色”，而是把可运行 MVP 升级为**可持续稳定运行的工程系统**。
 
