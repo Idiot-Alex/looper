@@ -8,6 +8,16 @@ from PIL import Image, ImageDraw, ImageFont
 INPUT = Path("/tmp/opc_output.txt")
 OUTPUT = Path("/Users/hotstrip/Developer/looper/docs/demo.gif")
 
+import argparse
+parser = argparse.ArgumentParser(description="OPC 输出 → 动画 GIF")
+parser.add_argument("--input", type=str, help="输入文本文件")
+parser.add_argument("--output", type=str, help="输出 GIF 文件")
+args = parser.parse_args()
+if args.input:
+    INPUT = Path(args.input)
+if args.output:
+    OUTPUT = Path(args.output)
+
 # ANSI 颜色 → RGB
 ANSI_COLORS = {
     30: (0, 0, 0),       # 黑
