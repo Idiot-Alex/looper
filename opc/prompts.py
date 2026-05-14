@@ -291,7 +291,7 @@ def build_qa_prompt(
     }
   ],
   "next_action": "accept/send_back_to_engineer",
-  "failure_type": "compile_error/test_failure/timeout/unknown",
+  "failure_type": "compile_error/test_failure/timeout/runtime_error/unknown",
   "needs_human_review": false,
   "suggested_fix": "建议修复方向（失败时必填）",
   "criterion_results": [
@@ -383,10 +383,56 @@ def infer_task_type(inbox_content: str) -> str:
 # =====================
 
 REPAIR_PROMPT_TEMPLATES = {
-    "compile_error": "检测到编译错误。请修复以下问题，专注于解决错误，不要改变其他功能。",
-    "test_failure": "测试失败。请根据 QA 报告中的失败检查和证据，分析问题并修复代码。",
-    "timeout": "命令执行超时。可能原因：代码死循环、等待时间过长或资源耗尽。请优化代码性能或增加超时处理。",
-    "unknown": "验收失败。请分析 QA 报告中的失败原因，理解预期行为与实际行为的差异，然后修复问题。",
+    "test_failure": """这是测试失败修复轮次。上一步 QA 已经运行了测试并给出了失败原因。
+
+**你的策略**：
+1. 先用 `read_file` 读取相关代码，理解 QA 失败的那一行
+2. 如果明确知道问题所在，用 `edit_file` 精准改那一行（不要重写整个文件）
+3. 如果需要确认，用 `search_code` 或 `list_files` 了解上下文
+4. 改完后输出 `files` JSON，**不要再调用工具**
+
+**禁止**：在没有 read_file 的情况下直接输出完整的 files JSON（那只是重复了上一次的错误）。""",
+
+    "compile_error": """这是编译错误修复轮次。上一步的代码有语法或导入错误。
+
+**你的策略**：
+1. 先用 `read_file` 定位报错文件和行号
+2. 修复语法错误或缺失的 import
+3. 保持其他功能不变，只做最小修改
+4. 改完后输出 `files` JSON，**不要再调用工具**
+
+**重点**：Python 常见编译错误包括：缩进问题、拼写错误、缺失引号、括号不匹配、缺少 import。""",
+
+    "timeout": """这是超时错误修复轮次。上一步的代码可能存在死循环或阻塞。
+
+**你的策略**：
+1. 先用 `read_file` 读取代码，找到可能导致超时的位置
+2. 常见原因：无限循环、无限递归、缺少超时保护、外部调用阻塞
+3. 加入超时处理或修复循环逻辑
+4. 改完后输出 `files` JSON，**不要再调用工具**
+
+**性能优先**：能用简单循环就不用复杂递归，能设置超时就不要无限等待。""",
+
+    "runtime_error": """这是运行时错误修复轮次。代码执行时崩溃了。
+
+**你的策略**：
+1. 先用 `read_file` 读取代码，找到可能崩溃的位置
+2. 常见原因：除零、访问 None 属性、列表越界、类型不匹配
+3. 添加防御性检查（如 `if x is None`）或修正逻辑
+4. 改完后输出 `files` JSON，**不要再调用工具**
+
+**防御性编程**：不要假设输入总是合法的。""",
+
+    "unknown": """这是通用修复轮次。验收失败但原因未知。
+
+**你的策略**：
+1. 用 `read_file` 读取所有相关代码
+2. 用 `search_code` 搜索与验收标准相关的逻辑
+3. 结合 QA 报告中的证据，理解"预期"和"实际"的差异
+4. 制定修复计划，一次只改一个点
+5. 改完后输出 `files` JSON，**不要再调用工具**
+
+**不要**：猜测原因而不读代码就重写整个文件。""",
 }
 
 
