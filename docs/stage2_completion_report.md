@@ -120,7 +120,7 @@ Git 快照: deb78aa
 | 能力 | 状态 | 备注 |
 |------|------|------|
 | **Engineer 小循环**（QA fail → 自动重修复） | ✅ 已实现（2026-05-14）| `REPAIR_PROMPT_TEMPLATES` 按 `failure_type` 提供专门修复策略，引导优先用 `read_file` + `edit_file` 精准修改 |
-| **Manager 大循环**（多轮 retry 后重规划） | ❌ 未实现 | 当前多次 retry 失败后直接 `failed`，无 Manager 重新介入机制 |
+| **Manager 大循环**（多轮 retry 后重规划） | ✅ 已实现（2026-05-14）| `run_manager_replan()` + `retry_history.json`，完全覆盖 task.json，换思路，最多 2 次 |
 | **主观/客观需求自动分流** | ❌ 未实现 | Manager 无法自动标记任务为主观/客观，human_gate 只能靠 QA 手动触发 |
 | **patch/diff 智能化写入** | ❌ 未实现 | Stage 2 规划已明确后置 |
 | **模型降级/升级策略** | ❌ 未实现 | Stage 2 P2 规划 |
