@@ -169,8 +169,28 @@ def run_engineer(status: dict, is_retry: bool = False) -> tuple[bool, str]:
     ]
     max_tool_calls = 10  # 防止无限循环
     tool_call_count = 0
+    final_attempt = False  # 工具上限到达后的最后一次机会
 
-    while tool_call_count < max_tool_calls:
+    while True:  # 循环条件在内部处理
+        # 防止无限循环
+        if tool_call_count >= max_tool_calls:
+            if final_attempt:
+                # 已经给过一次机会了，这次必须返回错误
+                print(f"❌ 工具调用循环超过 {max_tool_calls} 次仍未输出代码")
+                status["stage"] = "failed"
+                return False, "tool_loop_exceeded"
+            # 给一次机会，要求直接输出代码
+            print(f"⚠️ 工具调用已达上限，追加 final prompt 要求输出代码")
+            messages.append({
+                "role": "user",
+                "content": (
+                    "已达到工具调用上限。请立即输出最终代码，不要再调用任何工具。\n"
+                    "格式：{\"files\": [{\"path\": \"...\", \"content\": \"...\"}], \"summary\": \"...\"}"
+                ),
+            })
+            tool_call_count += 1
+            final_attempt = True
+
         # 记录 prompt
         log_prompt(
             session_id, role_name,
@@ -244,12 +264,6 @@ def run_engineer(status: dict, is_retry: bool = False) -> tuple[bool, str]:
 
         # 不是工具调用 → 写入文件
         break
-
-    # 如果是循环超限
-    if tool_call_count >= max_tool_calls:
-        print(f"❌ 工具调用循环超过 {max_tool_calls} 次仍未输出代码")
-        status["stage"] = "failed"
-        return False, "tool_loop_exceeded"
 
     # 写入文件（回放保护：跳过已写入文件）
     try:
