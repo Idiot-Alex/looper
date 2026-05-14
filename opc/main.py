@@ -549,12 +549,31 @@ def run_qa(status: dict) -> tuple[bool, str]:
     if data is None:
         print("❌ QA 输出 JSON 解析失败")
         log_parse_error(session_id, "qa", raw_output, 0)
+        # 写一个 fallback qa_report，让 handle_qa_result 能正常处理（写 retry_history）
+        fallback_qa = {
+            "passed": False,
+            "reason": f"QA 输出无法解析为有效 JSON: {raw_output[:200]!r}",
+            "failure_type": "qa_parse_error",
+            "evidence": evidence,
+        }
+        qa_file = session_dir / "qa_report.json"
+        with open(qa_file, "w", encoding="utf-8") as f:
+            json.dump(fallback_qa, f, ensure_ascii=False, indent=2)
         status["stage"] = "parse_error"
         return False, "parse_error"
     
     # 验证格式
     if not validate_qa_output(data):
         print("❌ QA 输出格式验证失败")
+        fallback_qa = {
+            "passed": False,
+            "reason": "QA 输出格式不符合要求（缺少必填字段）",
+            "failure_type": "qa_validation_error",
+            "evidence": evidence,
+        }
+        qa_file = session_dir / "qa_report.json"
+        with open(qa_file, "w", encoding="utf-8") as f:
+            json.dump(fallback_qa, f, ensure_ascii=False, indent=2)
         status["stage"] = "parse_error"
         return False, "validation_error"
     

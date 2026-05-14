@@ -291,7 +291,7 @@ def build_qa_prompt(
     }
   ],
   "next_action": "accept/send_back_to_engineer",
-  "failure_type": "compile_error/test_failure/timeout/runtime_error/unknown",
+  "failure_type": "compile_error/test_failure/timeout/runtime_error/qa_parse_error/qa_validation_error/unknown",
   "needs_human_review": false,
   "suggested_fix": "建议修复方向（失败时必填）",
   "criterion_results": [
@@ -433,6 +433,25 @@ REPAIR_PROMPT_TEMPLATES = {
 5. 改完后输出 `files` JSON，**不要再调用工具**
 
 **不要**：猜测原因而不读代码就重写整个文件。""",
+
+    "qa_parse_error": """这是 QA 评估错误修复轮次。QA 模型无法将输出解析为有效 JSON。
+
+**你的策略**：
+1. 用 `read_file` 读取 Engineer 写的代码
+2. 确认代码逻辑是否正确实现了验收标准
+3. 如果代码本身有问题，用 `edit_file` 修复
+4. 如果代码看起来正确，可能是测试命令问题，考虑用 `search_code` 检查
+5. 改完后输出 `files` JSON，**不要再调用工具**
+
+**重点**：QA 解析失败不一定代表代码有问题，可能是 QA 模型太弱或测试命令格式不对。""",
+
+    "qa_validation_error": """这是 QA 评估错误修复轮次。QA 输出格式不符合要求（缺少必填字段）。
+
+**你的策略**：
+1. 先确认代码本身是否正确实现了验收标准
+2. 如果代码有问题，用 `edit_file` 精准修复
+3. 如果代码正确，问题可能在测试命令或验收标准定义上
+4. 改完后输出 `files` JSON，**不要再调用工具**""",
 }
 
 
