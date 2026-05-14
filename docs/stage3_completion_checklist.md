@@ -94,7 +94,7 @@ uv run pytest tests/ -q
 
 | 验证项 | 状态 | 证据 |
 |--------|------|------|
-| REPAIR_PROMPT_TEMPLATES 7类型 | ✅ | `keys()` 返回 7 个 |
+| REPAIR_PROMPT_TEMPLATES 7类型 | ✅ | `keys()` 返回 7 个 | 实测: test_failure, compile_error, timeout, runtime_error, qa_parse_error, qa_validation_error, unknown |
 | test_failure 引导策略 | ✅ | 包含 read_file + edit_file |
 | completed_stages 重置 | ✅ | handle_qa_result 中 |
 | tool_result continuation | ✅ | main.py continuation prompt |
