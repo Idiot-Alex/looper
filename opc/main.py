@@ -514,6 +514,9 @@ def handle_qa_result(status: dict) -> None:
         
         if retry_count < MAX_RETRIES:
             status["stage"] = "engineer_retry"
+            # 关键修复：清空 completed_stages 让 Engineer 重新运行
+            # 否则 completed_stages 中的 'engineer' 会导致 Engineer 阶段被跳过
+            status["completed_stages"] = ["manager"]
             print(f"🔄 进入重试模式 ({retry_count}/{MAX_RETRIES})")
             
             # 记录 failure_type 用于选择修复 prompt
