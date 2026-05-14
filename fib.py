@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import sys
 
 def fib(n: int) -> int:
@@ -5,22 +6,22 @@ def fib(n: int) -> int:
         raise ValueError("N must be non-negative")
     if n == 0:
         return 0
-    a, b = 0, 1
-    for _ in range(1, n):
-        a, b = b, a + b
-    return b
+    elif n == 1:
+        return 1
+    else:
+        a, b = 0, 1
+        for _ in range(2, n + 1):
+            a, b = b, a + b
+        return b
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:
-        print("Usage: python3 fib.py <N>")
+        print("Usage: python3 fib.py <N>", file=sys.stderr)
         sys.exit(1)
     try:
         n = int(sys.argv[1])
-    except ValueError:
-        print("Error: N must be an integer")
+        result = fib(n)
+        print(result)
+    except ValueError as e:
+        print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)
-    if n < 0:
-        print("Error: N must be non-negative")
-        sys.exit(1)
-    result = fib(n)
-    print(result)
