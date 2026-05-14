@@ -119,7 +119,7 @@ Git 快照: deb78aa
 
 | 能力 | 状态 | 备注 |
 |------|------|------|
-| **Engineer 小循环**（QA fail → 自动重修复） | ⏳ 部分支持 | 当前 QA fail 后进入 `engineer_retry`，但 retry 仍依赖 LLM 自行理解失败原因，无专门修复 prompt |
+| **Engineer 小循环**（QA fail → 自动重修复） | ✅ 具备条件（completed_stages 重置修复后）| 当前 QA fail 后进入 `engineer_retry`，但 retry 仍依赖 LLM 自行理解失败原因，无专门修复 prompt |
 | **Manager 大循环**（多轮 retry 后重规划） | ❌ 未实现 | 当前多次 retry 失败后直接 `failed`，无 Manager 重新介入机制 |
 | **主观/客观需求自动分流** | ❌ 未实现 | Manager 无法自动标记任务为主观/客观，human_gate 只能靠 QA 手动触发 |
 | **patch/diff 智能化写入** | ❌ 未实现 | Stage 2 规划已明确后置 |
