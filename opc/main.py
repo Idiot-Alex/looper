@@ -11,7 +11,7 @@ from pathlib import Path
 from opc.config import (
     PROJECT_ROOT, TASKS_DIR, RUNTIME_DIR,
     STATUS_FILE, INBOX_FILE, MAX_RETRIES, MAX_API_RETRIES,
-    TERMINAL_STAGES,
+    MAX_MANAGER_REPLANS, TERMINAL_STAGES,
 )
 from opc.state import (
     load_status, save_status, init_status,
@@ -122,6 +122,108 @@ def run_manager(status: dict) -> tuple[bool, str]:
     })
     
     print(f"✅ Manager 完成: {data.get('goal', '')}")
+    return True, ""
+
+
+def run_manager_replan(status: dict) -> tuple[bool, str]:
+    """
+    执行 Manager 大循环重新规划
+
+    小循环（3次 retry）全部失败后，Manager 读取失败历史重新规划。
+    完全覆盖 task.json，换思路，不重复上一次的方案。
+    """
+    from opc.prompts import build_manager_replan_prompt
+
+    session_id = status.get("session_id", "unknown")
+    session_dir = get_session_dir(session_id)
+    history_file = session_dir / "retry_history.json"
+
+    # 读取失败历史
+    retry_history = []
+    if history_file.exists():
+        with open(history_file, encoding="utf-8") as f:
+            retry_history = json.load(f)
+
+    # 读取原始 goal
+    task_file = session_dir / "task.json"
+    original_goal = ""
+    if task_file.exists():
+        with open(task_file, encoding="utf-8") as f:
+            old_task = json.load(f)
+            original_goal = old_task.get("goal", "")
+
+    # 读取项目文件（供 Manager 参考）
+    project_files = _read_project_files()
+
+    # 构建 prompt
+    prompt = build_manager_replan_prompt(
+        original_goal=original_goal,
+        retry_history=retry_history,
+        project_files=project_files,
+    )
+
+    log_prompt(session_id, "manager_replan", prompt, 0)
+
+    print("🤖 调用 Manager (大循环重规划)...")
+    try:
+        raw_output = call_manager([{"role": "user", "content": prompt}])
+        log_llm_call(session_id, "manager_replan", "deepseek-v4-flash",
+                     success=True, stage="manager_replan")
+    except Exception as e:
+        print(f"❌ Manager 大循环调用失败: {e}")
+        log_llm_call(session_id, "manager_replan", "deepseek-v4-flash",
+                     success=False, error=str(e), stage="manager_replan")
+        return False, "api_error"
+
+    log_raw_output(session_id, "manager_replan", raw_output, 0)
+
+    # 解析 JSON
+    data = parse_json_safe(raw_output)
+    if data is None:
+        print("❌ Manager 大循环输出 JSON 解析失败")
+        log_parse_error(session_id, "manager_replan", raw_output, 0)
+        status["stage"] = "parse_error"
+        return False, "parse_error"
+
+    # 验证格式
+    if not validate_manager_output(data):
+        print("❌ Manager 大循环输出格式验证失败")
+        status["stage"] = "parse_error"
+        return False, "validation_error"
+
+    # 去重检测：steps 完全一样 = 没换思路
+    if task_file.exists():
+        old_steps = json.load(open(task_file, encoding="utf-8")).get("steps", [])
+        new_steps = data.get("steps", [])
+        if old_steps == new_steps and old_steps:
+            print("⚠️ Manager 未换思路，跳过本轮 replan")
+            status["stage"] = "failed"
+            return False, "duplicate_plan"
+
+    # 完全覆盖 task.json
+    with open(task_file, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+    # replan 计数 +1，重置小循环 retry_count
+    status["replan_count"] = status.get("replan_count", 0) + 1
+    status["retry_count"] = 0
+
+    # 清空 written_files 和 executed_commands（让 Engineer 重跑）
+    for f in ["written_files.json", "executed_commands.json"]:
+        try:
+            (session_dir / f).unlink()
+        except FileNotFoundError:
+            pass
+
+    # 保留 retry_history 供下一轮大循环用
+    mark_stage_completed(status, "manager")
+    log_session(session_id, "manager_replan_done", {
+        "replan_count": status["replan_count"],
+        "goal": data.get("goal", ""),
+    })
+
+    print(f"✅ Manager 大循环完成 (第 {status['replan_count']} 次)：{data.get('goal', '')}")
+    print(f"   新 steps: {data.get('steps', [])[:2]}...")
     return True, ""
 
 
@@ -484,6 +586,31 @@ def run_qa(status: dict) -> tuple[bool, str]:
     return True, ""
 
 
+def _append_retry_history(session_dir: Path, session_id: str, qa_data: dict, failure_type: str) -> None:
+    """把小循环失败记录追加到 retry_history，用于 Manager 大循环上下文"""
+    history_file = session_dir / "retry_history.json"
+    history = []
+    if history_file.exists():
+        with open(history_file, encoding="utf-8") as f:
+            history = json.load(f)
+
+    # 读取上一轮写的文件（从 session 目录下的 written_files）
+    written_files = []
+    wf_file = session_dir / "written_files.json"
+    if wf_file.exists():
+        with open(wf_file, encoding="utf-8") as f:
+            wf_data = json.load(f)
+            written_files = [f"{w.get('path', '')}" for w in wf_data] if isinstance(wf_data, list) else list(wf_data.keys())
+
+    history.append({
+        "failure_type": failure_type,
+        "qa_summary": qa_data.get("reason", "")[:200],
+        "files_written": written_files,
+    })
+    with open(history_file, "w", encoding="utf-8") as f:
+        json.dump(history, f, ensure_ascii=False, indent=2)
+
+
 def handle_qa_result(status: dict) -> None:
     """处理 QA 结果"""
     session_id = status.get("session_id", "unknown")
@@ -532,13 +659,22 @@ def handle_qa_result(status: dict) -> None:
             # 否则 completed_stages 中的 'engineer' 会导致 Engineer 阶段被跳过
             status["completed_stages"] = ["manager"]
             print(f"🔄 进入重试模式 ({retry_count}/{MAX_RETRIES})")
-            
+
             # 记录 failure_type 用于选择修复 prompt
             failure_type = qa_data.get("failure_type", "unknown")
             print(f"📋 失败类型: {failure_type}")
         else:
-            status["stage"] = "failed"
-            print(f"❌ 重试次数超限，任务失败")
+            # 小循环全部失败 → 写 retry_history，准备进入 Manager 大循环
+            _append_retry_history(session_dir, session_id, qa_data, failure_type)
+            replan_count = status.get("replan_count", 0)
+
+            if replan_count < MAX_MANAGER_REPLANS:
+                status["stage"] = "manager_replan"
+                status["completed_stages"] = []  # 清空让 Manager 重新跑
+                print(f"🔄 进入 Manager 大循环 ({replan_count + 1}/{MAX_MANAGER_REPLANS})")
+            else:
+                status["stage"] = "failed"
+                print(f"❌ 大循环次数超限，任务失败")
             
             # 创建失败快照（方便回滚）
             task_goal = ""
@@ -649,6 +785,28 @@ def run_single_task(session_id: str) -> str:
                         sys.exit(1)
                     print(f"⚠️ API 调用失败，重试 ({status['api_retry_count']}/{MAX_API_RETRIES})")
             
+            elif stage == "manager_replan":
+                success, error_type = run_manager_replan(status)
+                if success:
+                    status["stage"] = "manager_done"
+                    status["api_retry_count"] = 0
+                    status["parse_retry_count"] = 0
+                elif error_type == "parse_error":
+                    status["parse_retry_count"] += 1
+                    if status["parse_retry_count"] > 1:
+                        print("❌ Manager 大循环 JSON 解析连续失败，进入 failed")
+                        status["stage"] = "failed"
+                    else:
+                        print("⚠️ Manager 大循环 JSON 解析失败，重试")
+                else:
+                    # api_error / duplicate_plan
+                    status["api_retry_count"] += 1
+                    if status["api_retry_count"] >= MAX_API_RETRIES:
+                        print(f"❌ Manager 大循环 API 调用失败超限，进入 failed")
+                        status["stage"] = "failed"
+                    else:
+                        print(f"⚠️ Manager 大循环失败 (api_error/duplicate)，重试 ({status['api_retry_count']}/{MAX_API_RETRIES})")
+
             elif stage in ("manager_done", "engineer_retry"):
                 is_retry = (stage == "engineer_retry")
                 # engineer_retry 进入新角色调用，重置 parse 计数 (修正4)

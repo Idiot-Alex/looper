@@ -492,3 +492,93 @@ def build_repair_context(
         context += f"## 建议的修复方向\n{suggested_fix}\n\n"
     
     return context
+
+
+def build_manager_replan_prompt(
+    original_goal: str,
+    retry_history: list,
+    project_files: Optional[dict] = None,
+) -> str:
+    """
+    构建 Manager 大循环重新规划的 prompt
+
+    Args:
+        original_goal: 原始任务目标（不可偏离）
+        retry_history: 小循环失败历史
+            [{"failure_type": "...", "qa_summary": "...", "files_written": ["..."]}, ...]
+        project_files: 当前项目文件 dict[path, content]
+    """
+    prompt = """# Manager 角色（重新规划）
+
+你是 OPC 系统的 Manager。小循环（3次 Engineer retry）全部失败，现在需要你介入重新规划。
+
+## 重要约束
+1. **你只输出 JSON**，不要输出任何解释文字
+2. **不要用 markdown 代码块包裹 JSON**
+3. 原始目标不可偏离
+4. 必须换思路，不要重复上一次的方案
+
+## 原始目标（不可偏离）
+
+{original_goal}
+
+## 小循环失败历史
+
+请仔细分析以下失败记录，理解"为什么之前的方案失败了"：
+
+{retry_history}
+
+"""
+
+    # 格式化失败历史
+    history_text = ""
+    for i, record in enumerate(retry_history, 1):
+        history_text += f"**第 {i} 次小循环**\n"
+        history_text += f"- 失败类型: {record.get('failure_type', 'unknown')}\n"
+        history_text += f"- QA 摘要: {record.get('qa_summary', 'N/A')}\n"
+        history_text += f"- 修改过的文件: {', '.join(record.get('files_written', [])) or '无'}\n\n"
+
+    if not history_text:
+        history_text = "（无失败历史记录）\n"
+
+    prompt = prompt.format(
+        original_goal=original_goal,
+        retry_history=history_text,
+    )
+
+    # 当前项目文件
+    if project_files:
+        prompt += "## 当前项目文件\n"
+        for path, content in project_files.items():
+            prompt += f"\n### {path}\n```\n{content[:2000]}\n```\n"
+
+    prompt += """
+## 重新规划要求
+
+之前的方案都失败了。请换一个完全不同的思路重新规划。
+
+**换思路的要点**：
+- 分析每次失败的根本原因，不要只看表面
+- 如果是算法逻辑错误，换一个算法思路
+- 如果是边界条件处理失败，重新审视输入约束
+- 如果是实现方式有问题，考虑完全不同的技术方案
+
+## 输出要求
+
+请输出以下格式的 JSON：
+
+```json
+{
+  "goal": "本次任务目标（与原始目标保持一致）",
+  "steps": ["步骤1", "步骤2", "..."],
+  "acceptance_criteria": ["标准1", "标准2", "..."],
+  "notes": "实现注意事项（重点说明如何避免之前的失败原因）"
+}
+```
+
+**注意**：
+- goal 必须与原始目标一致
+- steps 和 acceptance_criteria 可以完全不同
+- notes 里要明确写出"如何避免重蹈覆辙"
+"""
+    return prompt

@@ -62,6 +62,7 @@ DEFAULT_COMMAND_TIMEOUT = 30  # 秒
 DEFAULT_STARTUP_TIMEOUT = 10  # 秒
 MAX_RETRIES = 3  # 最大重试次数
 MAX_API_RETRIES = 3  # API 调用最大重试次数
+MAX_MANAGER_REPLANS = 2  # Manager 大循环最大重规划次数
 
 # 允许写入的目录（白名单）
 ALLOWED_WRITE_DIRS = [PROJECT_ROOT]
