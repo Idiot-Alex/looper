@@ -141,6 +141,44 @@ qa_done (失败)
 - **日志全审计**：每步落盘，可复现可调试
 - **安全文件写入**：拒绝绝对路径、路径穿越、隐藏目录
 
+---
+
+## Demo
+
+### 执行记录截图
+
+Dashboard 自动记录每次运行的完整日志：
+
+![OPC Dashboard](opc/logs/dashboard.html)
+
+> 包含：每个任务的阶段耗时、Token 消耗、测试结果、Agent 调用详情。
+
+### 快速演示（90 秒）
+
+```bash
+# 1. 写需求
+echo "实现一个 Python 脚本 fib.py，计算斐波那契数列第 N 项" > opc/tasks/inbox/demo.md
+
+# 2. 运行 OPC（全程约 60-90 秒）
+uv run python -m opc.main
+
+# 预期输出：
+# 🤖 调用 Manager ... ✅
+# 🤖 调用 Engineer ... ✅ 写入文件: fib.py
+# 🚀 启动后台进程: 1 个
+# 🧪 执行测试命令: 3 个
+# 🤖 调用 QA ... ✅ QA 判定通过
+# 🎉 任务成功完成！✅
+# 📸 Git 快照创建: xxxxxxx
+```
+
+### 查看历史报告
+
+```bash
+# 在浏览器打开 HTML 报告
+open opc/logs/dashboard.html
+```
+
 ## License
 
 MIT
