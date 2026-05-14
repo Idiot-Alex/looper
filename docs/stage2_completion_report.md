@@ -119,7 +119,7 @@ Git 快照: deb78aa
 
 | 能力 | 状态 | 备注 |
 |------|------|------|
-| **Engineer 小循环**（QA fail → 自动重修复） | ✅ 具备条件（completed_stages 重置修复后）| 当前 QA fail 后进入 `engineer_retry`，但 retry 仍依赖 LLM 自行理解失败原因，无专门修复 prompt |
+| **Engineer 小循环**（QA fail → 自动重修复） | ✅ 已实现（2026-05-14）| `REPAIR_PROMPT_TEMPLATES` 按 `failure_type` 提供专门修复策略，引导优先用 `read_file` + `edit_file` 精准修改 |
 | **Manager 大循环**（多轮 retry 后重规划） | ❌ 未实现 | 当前多次 retry 失败后直接 `failed`，无 Manager 重新介入机制 |
 | **主观/客观需求自动分流** | ❌ 未实现 | Manager 无法自动标记任务为主观/客观，human_gate 只能靠 QA 手动触发 |
 | **patch/diff 智能化写入** | ❌ 未实现 | Stage 2 规划已明确后置 |
@@ -129,7 +129,7 @@ Git 快照: deb78aa
 
 ## 五、下一步风险
 
-1. **Engineer 小循环**：当前 retry 只是重新调用 Engineer，没有针对 `failure_type` 的专门修复 prompt 模板。模型可能重复犯相同错误。
+1. ~~**Engineer 小循环**：当前 retry 只是重新调用 Engineer，没有针对 `failure_type` 的专门修复 prompt 模板。~~ ✅ 已修复（2026-05-14）
 2. **human_gate 在非 tty 环境会超时**：需要实现基于文件的审批机制（写一个 flag 文件，外部脚本可以修改它）。
 3. **测试覆盖缺口**：工具系统（`read_file`、`edit_file`、`search_code`）没有单元测试，只有集成测试验证。
 
