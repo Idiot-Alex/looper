@@ -149,7 +149,9 @@ qa_done (失败)
 
 Dashboard 自动记录每次运行的完整日志：
 
-![OPC Dashboard](opc/logs/dashboard.html)
+![OPC Demo GIF — 逐字动画版](docs/demo.gif)
+
+> Dashboard HTML 面板：[opc/logs/dashboard.html](opc/logs/dashboard.html)
 
 > 包含：每个任务的阶段耗时、Token 消耗、测试结果、Agent 调用详情。
 
