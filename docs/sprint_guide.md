@@ -8,13 +8,56 @@
 
 ## Stage 2.5 前置验证（2026-05-13 ✅）
 
-> Day 1 执行记录：文档一致性 ✅ 18/18 测试 ✅ 真实任务 × 2 全部 success
+> Day 1 执行记录，逐一打勾：
+
+- [x] **文档一致性检查**：`Registry 中 4 工具 = 文档 4 工具，零漂移**
+  ```bash
+  uv run python3 scripts/check_doc_consistency.py
+  # ✅ 一致性检查通过
+  ```
+- [x] **全量测试 18/18**：
+  ```bash
+  uv run pytest tests/ -v
+  # 18 passed in 0.19s ✅
+  ```
+- [x] **真实任务 × 2 全部 success**：
+  ```bash
+  # 任务1: calculator.py（stdin 计算器）
+  # 会话 2026-05-14-003 ✅ success
+  # 关键链路: list_files → 写文件 → QA fail → retry → QA pass → Git 快照
+
+  # 任务2: reverse.py（字符串倒序）
+  # 会话 2026-05-14-004 ✅ success
+  # 关键链路: read_file 工具生效 → parse_error 修复 → QA pass
+  ```
+- [x] **Stage 3 探针实验**：DeepSeek V4 Flash 精准修复端口 8888→8889 ✅
+  ```bash
+  # 手动破坏 server_probe.py PORT=8889 → 触发 retry
+  # Engineer read_file 定位 → 修复 → QA 通过
+  ```
 
 ---
 
 ## Stage 2.5 当前状态
 
-**已落地** ✅
+**已落地** ✅（Day 1 验证完毕）
+
+- [x] Tool/ToolRegistry 抽象
+- [x] `read_file` 工具
+- [x] `edit_file` 工具
+- [x] `search_code` 工具
+- [x] `list_files` 工具
+- [x] `tool_call` 消息循环
+- [x] QA 读源码辅助
+- [x] `human_gate` 关卡
+- [x] 原子 `status.json` 写入
+- [x] 启动孤儿进程清理
+- [x] `STRICT_QUEUE_MODE` 开关
+
+**未落地** ⏳
+
+- [ ] **Stage 3: Manager 大循环** ✅ 已实现（2026-05-14）
+- [ ] **Stage 3: 主观/客观需求自动分流** ❌
 
 | 能力 | 核心文件 | 成功判定 |
 |------|---------|---------|
@@ -32,39 +75,13 @@
 
 **未落地** ⏳
 
-| 能力 | 规划阶段 | 状态 |
-|------|---------|------|
-| Manager 标记主观/客观需求 | Stage 2.5 P2 | 未开始 |
-| Stage 3: Engineer 小循环 | Stage 3 | 未开始 |
-| Stage 3: Manager 大循环 | Stage 3 | 未开始 |
-
----
-
-## Stage 3 预备清单
-
-在开始 Stage 3 前，建议先确认以下前置条件：
-
-### 工具行为稳定性
-```bash
-# 1. 文档一致性检查
-uv run python3 scripts/check_doc_consistency.py
-
-# 2. 全量测试
-uv run pytest tests/ -v
-
-# 3. 手动功能验证（一个真实任务）
-echo "实现一个计算器，支持加减乘除" > opc/tasks/inbox/2026-05-14-001.md
-uv run python -m opc.main
-```
-
-### Stage 3 核心改动预判
-
-| 改动点 | 当前实现 | Stage 3 目标 |
-|--------|---------|------------|
-| `engineer_done` → QA fail | → `engineer_retry` | → 小循环（自动重修复）最多 N 次 |
-| 多次小循环失败 | → `failed` | → Manager 大循环重规划 |
-| QA 主观判定 | → `needs_human_review` | → `human_gate` 审批后继续 |
-| 客观需求 | → QA pass → success | 不变 |
+| 能力 | 状态 | 备注 |
+|------|------|------|
+| **Engineer 小循环** | ✅ 已实现（2026-05-14）| `REPAIR_PROMPT_TEMPLATES` 7 类型专门策略 |
+| **Manager 大循环** | ✅ 已实现（2026-05-14）| `MAX_MANAGER_REPLANS=2`，去重检测 |
+| **主观/客观需求自动分流** | ❌ 未实现 | Manager 无法自动标记，human_gate 手动触发 |
+| `patch/diff` 智能化写入 | ❌ Stage 2 规划后置 | — |
+| 模型降级/升级策略 | ❌ Stage 2 P2 | — |
 
 ---
 
@@ -86,4 +103,29 @@ uv run python3 -c "from opc.tools import get_registry; print(list(get_registry()
 
 # 清理
 uv run pytest tests/ --cache-clear  # 清除缓存重新跑
+```
+
+---
+
+## Stage 3 Day 3 验证记录（2026-05-14 ✅）
+
+**Engineer 小循环** ✅ 已实现：
+- [x] `REPAIR_PROMPT_TEMPLATES` 7 个 failure_type（test_failure, compile_error, timeout, runtime_error, qa_parse_error, qa_validation_error, unknown）
+- [x] `test_failure` 引导 read_file + edit_file 精准修复
+- [x] `completed_stages` 在 retry 时重置为 `["manager"]`
+- [x] 探针实验：DeepSeek V4 Flash 精准定位 `PORT = 8889` 并修复
+
+**Manager 大循环** ✅ 已实现：
+- [x] `MAX_MANAGER_REPLANS = 2`
+- [x] `_append_retry_history()` 写入 `retry_history.json`（failure_type + qa_summary + files_written）
+- [x] `run_manager_replan()` 读取失败历史 + 源码 → 覆盖 task.json
+- [x] 去重检测：steps 完全相同 → failed
+- [x] 主循环 `manager_replan` case
+- [x] QA fallback qa_report（解析失败时也写 retry_history）
+
+**验证命令**：
+```bash
+uv run pytest tests/ -q  # 18/18 ✅
+uv run python3 -c "from opc.prompts import REPAIR_PROMPT_TEMPLATES; print(len(REPAIR_PROMPT_TEMPLATES))"  # 7
+uv run python3 -c "from opc.config import MAX_MANAGER_REPLANS; print(MAX_MANAGER_REPLANS)"  # 2
 ```
