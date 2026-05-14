@@ -131,7 +131,7 @@ Git 快照: deb78aa
 
 1. ~~**Engineer 小循环**：当前 retry 只是重新调用 Engineer，没有针对 `failure_type` 的专门修复 prompt 模板。~~ ✅ 已修复（2026-05-14）
 2. **human_gate 在非 tty 环境会超时**：需要实现基于文件的审批机制（写一个 flag 文件，外部脚本可以修改它）。
-3. **测试覆盖缺口**：工具系统（`read_file`、`edit_file`、`search_code`）没有单元测试，只有集成测试验证。
+3. ~~**测试覆盖缺口**：工具系统（`read_file`、`edit_file`、`search_code`）没有单元测试，只有集成测试验证。~~ ✅ 已修复（`tests/test_stage3.py` 16 个单元测试）
 
 ---
 
