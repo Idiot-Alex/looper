@@ -67,6 +67,15 @@ MAX_MANAGER_REPLANS = 2  # Manager 大循环最大重规划次数
 # 允许写入的目录（白名单）
 ALLOWED_WRITE_DIRS = [PROJECT_ROOT]
 
+# 包管理器映射
+PACKAGE_MANAGER_MAP = {
+    "python":     "pip install {pkg}",
+    "javascript": "npm install {pkg}",
+    "typescript": "npm install {pkg}",
+    "go":         "go get {pkg}",
+    "rust":       "cargo add {pkg}",
+}
+
 # 合法状态
 VALID_STAGES = [
     "inbox",

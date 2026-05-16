@@ -12,6 +12,7 @@ from opc.config import (
     PROJECT_ROOT, TASKS_DIR, RUNTIME_DIR,
     STATUS_FILE, INBOX_FILE, MAX_RETRIES, MAX_API_RETRIES,
     MAX_MANAGER_REPLANS, TERMINAL_STAGES,
+    DEEPSEEK_MODEL,
 )
 from opc.state import (
     load_status, save_status, init_status,
@@ -227,6 +228,43 @@ def run_manager_replan(status: dict) -> tuple[bool, str]:
     return True, ""
 
 
+def _install_dependencies(task_data: dict) -> None:
+    """按 language + dependencies 安装第三方依赖，失败不阻塞"""
+    from opc.config import PACKAGE_MANAGER_MAP
+    import subprocess, shlex
+
+    language = task_data.get("language", "python")
+    deps = task_data.get("dependencies", [])
+    if not deps:
+        return
+
+    cmd_template = PACKAGE_MANAGER_MAP.get(language)
+    if not cmd_template:
+        print(f"⚠️  未知语言 '{language}'，跳过依赖安装")
+        return
+
+    print(f"📦 安装 {language} 依赖: {', '.join(deps)}")
+    for dep in deps:
+        cmd = cmd_template.format(pkg=dep)
+        print(f"   运行: {cmd}")
+        try:
+            result = subprocess.run(
+                shlex.split(cmd),
+                capture_output=True, text=True, timeout=120,
+            )
+            if result.returncode == 0:
+                print(f"   ✅ {dep} 安装成功")
+            else:
+                print(f"   ⚠️  {dep} 安装可能失败: {result.stderr[:100]}")
+        except subprocess.TimeoutExpired:
+            print(f"   ⚠️  {dep} 安装超时（120s 未完成，跳过）")
+        except FileNotFoundError:
+            print(f"   ⚠️  {language} 包管理器未安装（跳过）")
+            break
+        except Exception as e:
+            print(f"   ⚠️  安装 {dep} 失败: {e}")
+
+
 def run_engineer(status: dict, is_retry: bool = False) -> tuple[bool, str]:
     """
     执行 Engineer 阶段（支持工具调用循环，Stage 2.5）
@@ -254,6 +292,9 @@ def run_engineer(status: dict, is_retry: bool = False) -> tuple[bool, str]:
 
     with open(task_file, "r", encoding="utf-8") as f:
         task_data = json.load(f)
+
+    # 前置步骤：按 language + dependencies 装依赖（Stage 3 P1）
+    _install_dependencies(task_data)
 
     # 读取 QA 报告（重试时需要）
     qa_report = None
@@ -540,10 +581,10 @@ def run_qa(status: dict) -> tuple[bool, str]:
     print("🤖 调用 QA...")
     try:
         raw_output = call_qa([{"role": "user", "content": prompt}])
-        log_llm_call(session_id, "qa", "MiniMax-M2.5", success=True, stage="qa")
+        log_llm_call(session_id, "qa", DEEPSEEK_MODEL, success=True, stage="qa")
     except Exception as e:
         print(f"❌ QA 调用失败: {e}")
-        log_llm_call(session_id, "qa", "MiniMax-M2.5", success=False, error=str(e), stage="qa")
+        log_llm_call(session_id, "qa", DEEPSEEK_MODEL, success=False, error=str(e), stage="qa")
         return False, "api_error"
     
     # 记录原始输出
@@ -715,16 +756,12 @@ def handle_qa_result(status: dict) -> None:
 
 def check_config():
     """检查必需配置"""
-    from opc.config import DEEPSEEK_API_KEY, MINIMAX_API_KEY
+    from opc.config import DEEPSEEK_API_KEY
     
     errors = []
     
     if not DEEPSEEK_API_KEY:
         errors.append("❌ DEEPSEEK_API_KEY 未设置")
-        errors.append("   请在 .env 文件或环境变量中配置")
-    
-    if not MINIMAX_API_KEY:
-        errors.append("❌ MINIMAX_API_KEY 未设置")
         errors.append("   请在 .env 文件或环境变量中配置")
     
     if errors:
@@ -736,7 +773,6 @@ def check_config():
         print()
         print("获取 Key 地址:")
         print("  DeepSeek: https://platform.deepseek.com/")
-        print("  MiniMax:  https://www.minimaxi.com/")
         print()
         print("配置方式:")
         print("  1. 编辑 .env 文件填入 key")

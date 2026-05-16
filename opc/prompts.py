@@ -75,11 +75,15 @@ def build_manager_prompt(
   "test_commands": ["前台验证命令"],
   "startup_wait_seconds": 启动最大等待秒数,
   "health_check_port": 服务端口号,
+  "language": "python / javascript / typescript / go / rust / shell / other",
+  "dependencies": ["包名列表，无需依赖则为空数组"],
   "notes": "其他约束或提示"
 }}
 ```
 
 **字段说明**：
+- `language`：项目实现语言。如不确定可以从 `python / javascript / typescript / go / rust / shell / other` 选一个最接近的
+- `dependencies`：需要的第三方依赖包名。Python 用 `pip install flask==3.0` 格式，JS 用 npm 包名
 - `background_commands`：后台命令用 `&` 结尾，如 `python3 server.py &`
 - `health_check_port`：服务端口号（必须设置），Runner 会先探端口再执行测试
 - `startup_wait_seconds`：端口探测的最大超时秒数，默认 10
