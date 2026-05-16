@@ -1,25 +1,24 @@
 {
   "goal": "为 server.py 添加 /health 端点，返回 JSON 状态信息",
   "steps": [
-    "在 server.py 文件末尾追加 /health 路由定义（使用 echo 命令）",
-    "确保 server.py 依赖的库已安装（如 Flask）",
-    "启动 server.py 服务后台运行",
-    "等待服务启动并监听端口",
-    "使用 curl 测试 /health 端点返回正确 JSON 和 HTTP 200 状态码"
+    "读取 server.py 文件，找到路由定义区域",
+    "在现有路由之后、文件末尾之前添加 @app.route('/health') 装饰器和对应函数",
+    "函数返回 flask.jsonify({'status': 'ok', 'message': 'server is running'}) 并设置状态码 200",
+    "保存文件，确保不修改已有路由逻辑"
   ],
   "acceptance_criteria": [
-    "curl http://localhost:5000/health 返回 JSON: {\"status\":\"ok\",\"message\":\"server is running\"}",
+    "访问 /health 返回 JSON: {\"status\": \"ok\", \"message\": \"server is running\"}",
     "HTTP 状态码为 200",
-    "原有路由（如根路径 /）仍然正常工作"
+    "原有路由（如 / 或其他端点）仍正常工作，不受影响"
   ],
   "background_commands": [
     "python3 server.py &"
   ],
   "test_commands": [
-    "curl -s -o /dev/null -w \"%{http_code}\" http://localhost:5000/health",
-    "curl -s http://localhost:5000/health"
+    "curl -s -o /dev/null -w '%{http_code}' http://localhost:5000/health | grep -q 200 && echo 'Status code 200 OK' || echo 'FAIL'",
+    "curl -s http://localhost:5000/health | python3 -c \"import sys,json; d=json.load(sys.stdin); assert d=={'status':'ok','message':'server is running'}; print('JSON matches')\""
   ],
-  "startup_wait_seconds": 5,
+  "startup_wait_seconds": 10,
   "health_check_port": 5000,
-  "notes": "追加路由代码到文件末尾时需注意缩进（4个空格）。如果 server.py 已经定义了 __main__ 块，追加可能导致路由定义在 main 之后，但 Flask 仍能正确加载。如遇语法错误，可手动调整代码格式。"
+  "notes": "默认 Flask 监听 5000 端口，若 server.py 使用其他端口需调整 health_check_port。添加代码时注意缩进一致，使用 jsonify 返回 JSON。"
 }

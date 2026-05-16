@@ -63,11 +63,11 @@ def create_deepseek_client() -> LLMClient:
 
 
 def create_minimax_client() -> LLMClient:
-    """创建 MiniMax 客户端（用于 QA）"""
+    """创建 MiniMax 客户端（用于 QA）——已切换到 DeepSeek V4 Flash"""
     return LLMClient(
-        api_key=MINIMAX_API_KEY,
-        base_url=MINIMAX_BASE_URL,
-        model=MINIMAX_MODEL,
+        api_key=DEEPSEEK_API_KEY,       # QA 用 DeepSeek（MiniMax M2.5 太弱，JSON 解析频繁失败）
+        base_url=DEEPSEEK_BASE_URL,
+        model=DEEPSEEK_MODEL,
     )
 
 
