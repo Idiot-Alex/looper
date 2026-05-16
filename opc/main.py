@@ -665,7 +665,13 @@ def _append_retry_history(session_dir: Path, session_id: str, qa_data: dict, fai
     if wf_file.exists():
         with open(wf_file, encoding="utf-8") as f:
             wf_data = json.load(f)
-            written_files = [f"{w.get('path', '')}" for w in wf_data] if isinstance(wf_data, list) else list(wf_data.keys())
+            if isinstance(wf_data, list):
+                if wf_data and isinstance(wf_data[0], dict):
+                    written_files = [f"{w.get('path', '')}" for w in wf_data]
+                else:
+                    written_files = [str(p) for p in wf_data]
+            else:
+                written_files = list(wf_data.keys())
 
     history.append({
         "failure_type": failure_type,
