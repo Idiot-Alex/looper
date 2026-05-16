@@ -1,9 +1,0 @@
-{
-  "files": [
-    {
-      "path": "server.py",
-      "content": "from flask import Flask, jsonify\n\napp = Flask(__name__)\n\n\n@app.route('/')\ndef index():\n    return 'Hello, World!'\n\n\n@app.route('/health')\ndef health():\n    return jsonify({'status': 'ok', 'message': 'server is running'}), 200\n\n\nif __name__ == '__main__':\n    app.run(host='0.0.0.0', port=5000)\n"
-    }
-  ],
-  "summary": "server.py 已包含 /health 路由，返回正确 JSON 和状态码 200。无需修改代码，测试失败可能是环境问题。"
-}
