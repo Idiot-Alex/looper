@@ -1,0 +1,9 @@
+{
+  "files": [
+    {
+      "path": "server.py",
+      "content": "from flask import Flask, jsonify\n\napp = Flask(__name__)\n\n@app.route('/')\ndef index():\n    return 'Hello OPC'\n\n@app.route('/health')\ndef health():\n    return jsonify({'status': 'ok', 'message': 'server is running'}), 200\n\nif __name__ == '__main__':\n    app.run(host='0.0.0.0', port=5000)\n"
+    }
+  ],
+  "summary": "server.py 已包含 /health 端点，返回 {'status':'ok','message':'server is running'} 和 HTTP 200 状态码，且原有根路径 '/' 正常工作。代码无需修改。"
+}

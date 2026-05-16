@@ -491,7 +491,12 @@ def run_qa(status: dict) -> tuple[bool, str]:
                 else:
                     result = execute_test_commands([cmd], session_id, str(PROJECT_ROOT))
                     results.extend(result)
-                    mark_command_executed(session_id, cmd)
+                    # 只有非空 stdout 才记录为已执行，避免服务未就绪时错误缓存
+                    stdout_empty = not result[0].get("stdout", "").strip() if result else True
+                    if not stdout_empty:
+                        mark_command_executed(session_id, cmd)
+                    else:
+                        print(f"⚠️ 命令 stdout 为空，不计入回放保护: {cmd[:50]}")
             evidence = results
         except Exception as e:
             print(f"❌ 测试执行失败: {e}")
@@ -671,16 +676,15 @@ def handle_qa_result(status: dict) -> None:
         # 增加重试计数
         increment_retry(status)
         retry_count = status.get("retry_count", 0)
-        
+        # 统一获取 failure_type（在 if 之前，避免 else 分支未定义）
+        failure_type = qa_data.get("failure_type", "unknown")
+
         if retry_count < MAX_RETRIES:
             status["stage"] = "engineer_retry"
             # 关键修复：清空 completed_stages 让 Engineer 重新运行
             # 否则 completed_stages 中的 'engineer' 会导致 Engineer 阶段被跳过
             status["completed_stages"] = ["manager"]
             print(f"🔄 进入重试模式 ({retry_count}/{MAX_RETRIES})")
-
-            # 记录 failure_type 用于选择修复 prompt
-            failure_type = qa_data.get("failure_type", "unknown")
             print(f"📋 失败类型: {failure_type}")
         else:
             # 小循环全部失败 → 写 retry_history，准备进入 Manager 大循环
@@ -871,8 +875,10 @@ def run_single_task(session_id: str) -> str:
                 elif error_type == "parse_error":
                     status["parse_retry_count"] += 1
                     if status["parse_retry_count"] > 1:
-                        print(f"❌ QA JSON 解析连续失败 2 次，进入 parse_error")
-                        status["stage"] = "parse_error"
+                        # QA 连续失败 2 次 → 强制写入 qa_report（fallback 已在 run_qa 写入）
+                        # 调用 handle_qa_result 走正常失败流程（写 retry_history + 决定下一步）
+                        print(f"❌ QA JSON 解析连续失败 2 次，调用 handle_qa_result")
+                        status["stage"] = "qa_done"  # 伪装成 qa_done，让 handle_qa_result 处理
                     else:
                         print(f"⚠️ QA JSON 解析失败，重试 (1/1)")
                 else:

@@ -1,0 +1,23 @@
+{
+  "goal": "实现一个Flask项目，包含 / 返回'Hello from Flask'，/health 返回 JSON {\"status\": \"ok\"}，项目放在 flask_app/ 目录，主文件 app.py，通过 `uv run python flask_app/app.py` 启动",
+  "steps": [
+    "确保当前目录为项目根目录",
+    "执行 uv add flask 以创建 pyproject.toml 并安装 Flask 依赖",
+    "创建 flask_app 目录：mkdir -p flask_app",
+    "创建 flask_app/app.py 文件，写入以下内容：\nfrom flask import Flask, jsonify\n\napp = Flask(__name__)\n\n@app.route('/')\ndef home():\n    return 'Hello from Flask'\n\n@app.route('/health')\ndef health():\n    return jsonify({\"status\": \"ok\"})\n\nif __name__ == '__main__':\n    app.run(host='0.0.0.0', port=5000)"
+  ],
+  "acceptance_criteria": [
+    "执行 curl http://localhost:5000/ 返回 'Hello from Flask'",
+    "执行 curl http://localhost:5000/health 返回 JSON {\"status\":\"ok\"}"
+  ],
+  "background_commands": [
+    "uv run python flask_app/app.py &"
+  ],
+  "test_commands": [
+    "curl -s http://localhost:5000/",
+    "curl -s http://localhost:5000/health"
+  ],
+  "startup_wait_seconds": 5,
+  "health_check_port": 5000,
+  "notes": "请确保当前目录下没有其他程序占用 5000 端口；uv run 会自动使用 pyproject.toml 中的依赖，如果尚未安装 flask，请先执行 uv add flask"
+}

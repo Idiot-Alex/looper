@@ -1,0 +1,12 @@
+{
+  "stage": "qa_done",
+  "retry_count": 3,
+  "parse_retry_count": 0,
+  "session_id": "task2_health",
+  "completed_stages": [
+    "manager",
+    "engineer",
+    "qa"
+  ],
+  "api_retry_count": 0
+}
