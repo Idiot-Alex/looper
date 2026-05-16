@@ -69,7 +69,7 @@ ALLOWED_WRITE_DIRS = [PROJECT_ROOT]
 
 # 包管理器映射
 PACKAGE_MANAGER_MAP = {
-    "python":     "pip install {pkg}",
+    "python":     "uv pip install {pkg}",  # uv 项目用 uv pip
     "javascript": "npm install {pkg}",
     "typescript": "npm install {pkg}",
     "go":         "go get {pkg}",
