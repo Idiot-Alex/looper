@@ -36,6 +36,10 @@ opc/logs/events.jsonl
 opc/logs/metrics.json
 opc/logs/dashboard.html
 
+# OPC 输出目录（所有生成的文件放这里）
+output/*
+!output/.gitkeep
+
 # 队列目录
 opc/tasks/done/
 opc/tasks/inbox/*.md
@@ -43,6 +47,9 @@ opc/tasks/inbox/*.md
 # Session 独立目录（每个任务的中间状态）
 opc/tasks/20*-*/
 opc/tasks/test-*/
+opc/tasks/task*/
+opc/tasks/demo*/
+opc/tasks/fail*/
 
 # 保留目录结构
 !opc/runtime/.gitkeep
@@ -50,10 +57,13 @@ opc/tasks/test-*/
 !opc/logs/prompts/.gitkeep
 !opc/logs/raw_outputs/.gitkeep
 !opc/logs/command_runs/.gitkeep
+!opc/tasks/done/.gitkeep
+!opc/tasks/inbox/.gitkeep
 
-# OPC generated files (Engineer output in project root)
-*.py.bak
+# OPC generated files (旧根目录产物——已迁移到 output/ 下)
+fib.py
+prime.py
+calculator.py
 hello*.py
 server*.py
-test*.sh
-src/test_*.sh
+opc/writer.py

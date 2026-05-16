@@ -93,6 +93,7 @@ def build_manager_prompt(
 - `background_commands` 先执行
 - Runner 等待 `startup_wait_seconds` 后执行 `test_commands`
 - 命令要写完整（如 `node src/index.js`，不是 `npm start`）
+- 所有生成的文件放在 `output/` 目录下，除非需求明确指定其他路径
 
 请直接输出 JSON：
 """
@@ -116,6 +117,7 @@ def build_engineer_prompt(
 2. **可以调用工具读取现有文件**
 3. 只能修改项目工作区内文件
 4. 不改需求，不跳过验收标准
+5. 生成的新文件放在 `output/` 目录下（如 `output/app.py`），除非任务明确指定其他路径
 
 ## 当前任务
 
