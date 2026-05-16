@@ -25,7 +25,7 @@ from opc.queue import (
     is_command_executed, mark_command_executed,
     is_file_written, mark_file_written,
 )
-from opc.llm import call_manager, call_engineer, call_qa
+from opc.llm import call_manager, call_engineer, call_qa, call_qa_formatter
 from opc.parser import (
     parse_json_safe, parse_json_strict,
     validate_manager_output, validate_engineer_output,
@@ -44,7 +44,8 @@ from opc.logger import (
     log_session_timeout,
 )
 from opc.prompts import (
-    build_manager_prompt, build_engineer_prompt, build_qa_prompt,
+    build_manager_prompt, build_engineer_prompt,
+    build_qa_prompt, build_qa_analysis_prompt, build_qa_format_prompt,
     infer_task_type,
 )
 from opc.config import SESSION_TIMEOUT_SECONDS
