@@ -258,6 +258,18 @@ def _install_dependencies(task_data: dict) -> None:
 
     print(f"📦 安装 {language} 依赖: {', '.join(deps)}")
     for dep in deps:
+        # 先检查是否已安装（避免 uv 锁冲突）
+        try:
+            check = subprocess.run(
+                shlex.split(f"uv pip show {dep.split('==')[0]}"),
+                capture_output=True, text=True, timeout=15,
+            )
+            if check.returncode == 0:
+                print(f"   ✅ {dep} 已安装，跳过")
+                continue
+        except Exception:
+            pass
+
         cmd = cmd_template.format(pkg=dep)
         print(f"   运行: {cmd}")
         try:

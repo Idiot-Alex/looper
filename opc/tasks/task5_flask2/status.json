@@ -1,8 +1,13 @@
 {
-  "stage": "manager_replan",
+  "stage": "failed",
   "retry_count": 3,
   "parse_retry_count": 0,
   "session_id": "task5_flask2",
-  "completed_stages": [],
-  "api_retry_count": 0
+  "completed_stages": [
+    "manager",
+    "engineer",
+    "qa"
+  ],
+  "api_retry_count": 0,
+  "replan_count": 2
 }
