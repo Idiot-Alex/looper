@@ -127,6 +127,18 @@ def run_manager(status: dict) -> tuple[bool, str]:
     return True, ""
 
 
+def _read_project_files(max_files: int = 5) -> dict:
+    """读取项目中修改过的文件列表和内容，供 Manager 大循环参考"""
+    files = {}
+    for entry in sorted(Path(".").iterdir())[:max_files]:
+        if entry.is_file() and entry.suffix in (".py", ".html", ".js", ".css", ".json", ".md"):
+            try:
+                files[entry.name] = entry.read_text(encoding="utf-8")[:2000]
+            except Exception:
+                pass
+    return files
+
+
 def run_manager_replan(status: dict) -> tuple[bool, str]:
     """
     执行 Manager 大循环重新规划
