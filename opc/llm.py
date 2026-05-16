@@ -84,6 +84,12 @@ def call_engineer(messages: list) -> str:
 
 
 def call_qa(messages: list) -> str:
-    """调用 QA（使用 DeepSeek——MiniMax M2.5 JSON 解析太弱）"""
+    """调用 MiniMax 做自由格式分析（不要求 JSON）"""
+    client = create_minimax_client()
+    return client.chat(messages)
+
+
+def call_qa_formatter(messages: list) -> str:
+    """调用 DeepSeek 将分析报告格式化为严格 JSON"""
     client = create_deepseek_client()
     return client.chat(messages)

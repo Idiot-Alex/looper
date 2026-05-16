@@ -1,0 +1,12 @@
+{
+  "stage": "success",
+  "retry_count": 0,
+  "parse_retry_count": 0,
+  "session_id": "task4_index",
+  "completed_stages": [
+    "manager",
+    "engineer",
+    "qa"
+  ],
+  "api_retry_count": 0
+}

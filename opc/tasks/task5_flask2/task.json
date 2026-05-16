@@ -1,0 +1,29 @@
+{
+  "goal": "实现一个Flask项目，包含根路径和健康检查端点",
+  "steps": [
+    "创建flask_app目录",
+    "在flask_app目录下创建app.py文件，实现Flask应用",
+    "使用uv安装Flask依赖",
+    "通过uv run启动Flask服务",
+    "使用curl验证根路径和健康检查"
+  ],
+  "acceptance_criteria": [
+    "访问根路径返回纯文本 'Hello from Flask'",
+    "访问/health路径返回JSON {\"status\": \"ok\"}",
+    "项目结构为flask_app/app.py，可通过uv run python flask_app/app.py启动"
+  ],
+  "background_commands": [
+    "uv run python flask_app/app.py &"
+  ],
+  "test_commands": [
+    "curl -s http://localhost:5000/",
+    "curl -s http://localhost:5000/health"
+  ],
+  "startup_wait_seconds": 10,
+  "health_check_port": 5000,
+  "language": "python",
+  "dependencies": [
+    "flask==3.0"
+  ],
+  "notes": "确保flask_app目录存在且app.py位于其下"
+}

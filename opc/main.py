@@ -571,34 +571,46 @@ def run_qa(status: dict) -> tuple[bool, str]:
         except Exception:
             pass  # 源码不可用时继续
 
-    # 构建 QA prompt（带源码上下文）
-    prompt = build_qa_prompt(task_data, evidence, source_code)
-    
-    # 记录 prompt
-    log_prompt(session_id, "qa", prompt, 0)
-    
-    # 调用 QA
-    print("🤖 调用 QA...")
+    # === 两阶段 QA 流程 ===
+    # 阶段1：MiniMax 做自由格式分析（无 parse_error 风险）
+    analysis_prompt = build_qa_analysis_prompt(task_data, evidence, source_code)
+    log_prompt(session_id, "qa_analysis", analysis_prompt, 0)
+
+    print("🤖 QA 分析 (MiniMax)...")
     try:
-        raw_output = call_qa([{"role": "user", "content": prompt}])
-        log_llm_call(session_id, "qa", DEEPSEEK_MODEL, success=True, stage="qa")
+        raw_analysis = call_qa([{"role": "user", "content": analysis_prompt}])
+        log_llm_call(session_id, "qa", "MiniMax-M2.5", success=True, stage="qa_analysis")
     except Exception as e:
-        print(f"❌ QA 调用失败: {e}")
-        log_llm_call(session_id, "qa", DEEPSEEK_MODEL, success=False, error=str(e), stage="qa")
+        print(f"❌ QA 分析失败: {e}")
+        log_llm_call(session_id, "qa", "MiniMax-M2.5", success=False, error=str(e), stage="qa_analysis")
         return False, "api_error"
-    
-    # 记录原始输出
-    log_raw_output(session_id, "qa", raw_output, 0)
-    
-    # 解析 JSON
-    data = parse_json_safe(raw_output)
+
+    log_raw_output(session_id, "qa_analysis", raw_analysis, 0)
+
+    # 阶段2：DeepSeek 将分析报告格式化为严格 JSON
+    format_prompt = build_qa_format_prompt(raw_analysis, task_data)
+    log_prompt(session_id, "qa_format", format_prompt, 0)
+
+    print("🤖 QA 格式化 (DeepSeek)...")
+    try:
+        raw_json = call_qa_formatter([{"role": "user", "content": format_prompt}])
+        log_llm_call(session_id, "qa", DEEPSEEK_MODEL, success=True, stage="qa_format")
+    except Exception as e:
+        print(f"❌ QA 格式化失败: {e}")
+        log_llm_call(session_id, "qa", DEEPSEEK_MODEL, success=False, error=str(e), stage="qa_format")
+        # DeepSeek 失败时才退回到 fallback（异常情况，不是解析失败）
+        return False, "api_error"
+
+    log_raw_output(session_id, "qa_format", raw_json, 0)
+
+    # 解析 JSON（DeepSeek 格式化的，很少失败）
+    data = parse_json_safe(raw_json)
     if data is None:
-        print("❌ QA 输出 JSON 解析失败")
-        log_parse_error(session_id, "qa", raw_output, 0)
-        # 写一个 fallback qa_report，让 handle_qa_result 能正常处理（写 retry_history）
+        print("❌ QA 格式化输出 JSON 解析失败")
+        log_parse_error(session_id, "qa_format", raw_json, 0)
         fallback_qa = {
             "passed": False,
-            "reason": f"QA 输出无法解析为有效 JSON: {raw_output[:200]!r}",
+            "reason": f"DeepSeek 格式化为 JSON 失败。原始分析摘要: {raw_analysis[:300]}",
             "failure_type": "qa_parse_error",
             "evidence": evidence,
         }
@@ -607,13 +619,13 @@ def run_qa(status: dict) -> tuple[bool, str]:
             json.dump(fallback_qa, f, ensure_ascii=False, indent=2)
         status["stage"] = "parse_error"
         return False, "parse_error"
-    
+
     # 验证格式
     if not validate_qa_output(data):
-        print("❌ QA 输出格式验证失败")
+        print("❌ QA 格式化输出格式验证失败")
         fallback_qa = {
             "passed": False,
-            "reason": "QA 输出格式不符合要求（缺少必填字段）",
+            "reason": "DeepSeek 格式化输出不符合 schema",
             "failure_type": "qa_validation_error",
             "evidence": evidence,
         }
@@ -622,7 +634,7 @@ def run_qa(status: dict) -> tuple[bool, str]:
             json.dump(fallback_qa, f, ensure_ascii=False, indent=2)
         status["stage"] = "parse_error"
         return False, "validation_error"
-    
+
     # 保存 qa_report.json（Stage 2: session 独立目录）
     qa_file = session_dir / "qa_report.json"
     with open(qa_file, "w", encoding="utf-8") as f:

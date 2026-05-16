@@ -313,6 +313,8 @@ def build_qa_prompt(
 
 **关于 `needs_human_review`**：如果任务涉及主观判断（如 UI 美观、文案质量、架构选择），且你无法仅凭客观标准判定，请设置 `needs_human_review: true`，系统将暂停等待人工审批。
 
+**关于依赖检查**：如果 task.json 的 dependencies 不为空，请在分析前确认这些包已安装。如果包未安装导致测试无法执行，这是一个 runtime_error。
+
 请直接输出 JSON：
 """
     
@@ -603,5 +605,100 @@ def build_manager_replan_prompt(
 - goal 必须与原始目标一致
 - steps 和 acceptance_criteria 可以完全不同
 - notes 里要明确写出"如何避免重蹈覆辙"
+"""
+    return prompt
+
+
+def build_qa_analysis_prompt(
+    task_json: dict,
+    evidence: list,
+    source_code: Optional[dict] = None,
+) -> str:
+    """构建 MiniMax 分析 prompt——自由格式分析，不要求 JSON"""
+    prompt = f"""# QA 分析任务
+
+请分析以下执行结果是否满足验收标准。
+
+## 任务目标
+
+{task_json.get('goal', '')}
+
+## 验收标准
+
+"""
+    for criteria in task_json.get("acceptance_criteria", []):
+        prompt += f"- {criteria}\n"
+
+    prompt += "\n## 执行结果\n\n"
+    for i, ev in enumerate(evidence or [], 1):
+        if isinstance(ev, dict):
+            prompt += f"### 命令 {i}: {ev.get('command', 'N/A')}\n"
+            prompt += f"- 退出码: {ev.get('exit_code', 'N/A')}\n"
+            prompt += f"- 标准输出: {ev.get('stdout', '')[:500]}\n"
+            prompt += f"- 错误输出: {ev.get('stderr', '')[:500]}\n\n"
+
+    # 依赖检查
+    deps = task_json.get("dependencies", [])
+    if deps:
+        prompt += f"## 依赖检查\n所需依赖: {', '.join(deps)}\n请分析这些包是否已正确安装。\n\n"
+
+    if source_code:
+        prompt += "## Engineer 源码\n\n"
+        for path, content in source_code.items():
+            prompt += f"### {path}\n```\n{content[:1500]}\n```\n\n"
+
+    prompt += """## 分析要求
+
+请用自然语言（不要求 JSON）分析：
+1. 哪些验收标准通过了，哪些没通过
+2. 没通过的具体原因（错误信息、预期 vs 实际）
+3. 可能的修复方向
+4. 风险等级（high/medium/low）
+5. 是否需要人工审批（如果涉及美观/主观判断等）
+
+你不需要输出 JSON，自由格式分析即可。完整、准确、具体的分析报告，对后续步骤至关重要。
+"""
+    return prompt
+
+
+def build_qa_format_prompt(raw_analysis: str, task_json: dict) -> str:
+    """构建 DeepSeek 格式化 prompt——将分析报告转为严格 JSON"""
+    deps = task_json.get("dependencies", [])
+    deps_check = ""
+    if deps:
+        deps_check = f'\n依赖检查: {"、".join(deps)}。如分析报告中提到包未安装，这是一个 runtime_error。'
+
+    prompt = f"""# JSON 格式化任务
+
+请将以下分析报告格式化为严格的 JSON。
+
+## 原始分析报告
+
+{raw_analysis}
+
+## 输出要求
+
+请严格按照以下 schema 输出一个 JSON 对象，不要输出任何其他文字：
+
+```json
+{{{deps_check}
+  "passed": true/false,
+  "failure_type": "test_failure|compile_error|timeout|runtime_error|unknown",
+  "reason": "根据分析报告提炼的判定理由",
+  "criterion_results": [
+    {{"criterion": "验收标准原文", "passed": true/false, "evidence": "证据摘要"}}
+  ],
+  "risk_level": "high|medium|low",
+  "needs_human_review": true/false,
+  "suggested_fix": "建议修复方向（失败时必填）"
+}}
+```
+
+**规则**：
+- passed: 所有验收标准通过 → true；有任何未通过 → false
+- failure_type: 根据原始分析中的失败原因选择最匹配的类型
+- criterion_results: 每个验收标准一条，客观依据来自分析报告
+- suggested_fix: 失败时必填，建议具体的代码修改方向
+- 只输出 JSON，不要 markdown 代码块，不要任何解释文字
 """
     return prompt

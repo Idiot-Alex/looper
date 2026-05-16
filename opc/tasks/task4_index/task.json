@@ -1,0 +1,34 @@
+{
+  "goal": "设计并创建美观的深色主题首页 index.html，包含导航栏、英雄区、功能卡片区，使用 CSS 动画和渐变，纯 HTML + CSS，无需后端。",
+  "steps": [
+    "在项目根目录创建 index.html 文件",
+    "实现深色主题（使用 #0a0a0a 或类似背景）",
+    "设计固定导航栏，包含 Logo 和菜单项（Home, Features, About, Contact）",
+    "设计英雄区：大标题、副标题、渐变背景、动画按钮",
+    "设计功能卡片区：至少3张卡片，带 hover 动画和渐变边框",
+    "使用 CSS 动画：渐变背景滚动、卡片上浮、按钮脉冲等",
+    "确保所有样式内联或合并到单个 <style> 块中（无需外部文件）"
+  ],
+  "acceptance_criteria": [
+    "index.html 文件存在于项目根目录",
+    "页面包含 <nav> 元素且内有至少4个链接",
+    "页面包含 <section> 或 <div> 作为英雄区，且包含 <h1> 大标题",
+    "页面包含至少3个卡片元素（class 包含 card）",
+    "CSS 中包含 @keyframes 动画定义",
+    "CSS 中包含 background: 渐变样式",
+    "使用 curl 访问 http://localhost:8000 返回 HTTP 200",
+    "curl 获取的响应体包含字符串 'nav'、'hero'、'card'"
+  ],
+  "background_commands": [
+    "python3 -m http.server 8000 &"
+  ],
+  "test_commands": [
+    "curl -s -o /dev/null -w '%{http_code}' http://localhost:8000/index.html | grep -q 200 && echo 'HTTP 200 OK'",
+    "curl -s http://localhost:8000/index.html | grep -q '<nav' && echo 'Contains <nav>'",
+    "curl -s http://localhost:8000/index.html | grep -q 'hero' && echo 'Contains hero'",
+    "curl -s http://localhost:8000/index.html | grep -q 'card' && echo 'Contains card'"
+  ],
+  "startup_wait_seconds": 5,
+  "health_check_port": 8000,
+  "notes": "使用 Python 3 内置 HTTP 服务器提供静态文件；测试命令会依次检查状态码和关键标签。"
+}
