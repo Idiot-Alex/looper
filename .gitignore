@@ -67,3 +67,5 @@ calculator.py
 hello*.py
 server*.py
 opc/writer.py
+*.bak
+*.bak
