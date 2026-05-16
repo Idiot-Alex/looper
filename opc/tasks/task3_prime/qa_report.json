@@ -1,19 +1,31 @@
 {
-  "passed": false,
-  "reason": "QA 输出无法解析为有效 JSON: '<think>我需要作为 QA 来判断这个任务是否满足验收标准。让我分析一下情况：\\n\\n## 验收标准\\n1. n<=0 返回 False\\n2. n=1 返回 False\\n3. n=2 返回 True\\n4. n=3 返回 True\\n5. n=4 返回 False\\n6. n=17 返回 True\\n7. n=97 返回 True\\n8. n=100 返回 False\\n9. n=-5 返回 False\\n10.'",
-  "failure_type": "qa_parse_error",
+  "passed": true,
+  "reason": "两个验收标准均通过：命令输出'OK'且无除零错误",
+  "failed_checks": [],
   "evidence": [
     {
-      "stdout": "def is_prime(n):\n    if not isinstance(n, int):\n        return False\n    if n <= 1:\n        return False\n    if n == 2:\n        return True\n    if n % 2 == 0:\n        return False\n    i = 3\n    while i * i <= n:\n        if n % i == 0:\n            return False\n        i += 2\n    return True\n",
-      "stderr": "cat: >: No such file or directory\ncat: <<: No such file or directory\ncat: EOF: No such file or directory\ncat: def: No such file or directory\ncat: is_prime(n):: No such file or directory\ncat: if: No such file or directory\ncat: n: No such file or directory\ncat: <=: No such file or directory\ncat: 1:: No such file or directory\ncat: return: No such file or directory\ncat: False: No such file or directory\ncat: if: No such file or directory\ncat: n: No such file or directory\ncat: ==: No such file or directory\ncat: 2:: No such file or directory\ncat: return: No such file or directory\ncat: True: No such file or directory\ncat: if: No such file or directory\ncat: n: No such file or directory\ncat: %: No such file or directory\ncat: 2: No such file or directory\ncat: ==: No such file or directory\ncat: 0:: No such file or directory\ncat: return: No such file or directory\ncat: False: No such file or directory\ncat: for: No such file or directory\ncat: i: No such file or directory\ncat: in: No such file or directory\ncat: range(3,: No such file or directory\ncat: int(n**0.5): No such file or directory\ncat: +: No such file or directory\ncat: 1,: No such file or directory\ncat: 2):: No such file or directory\ncat: if: No such file or directory\ncat: n: No such file or directory\ncat: %: No such file or directory\ncat: i: No such file or directory\ncat: ==: No such file or directory\ncat: 0:: No such file or directory\ncat: return: No such file or directory\ncat: False: No such file or directory\ncat: return: No such file or directory\ncat: True: No such file or directory\ncat: EOF: No such file or directory\n",
-      "exit_code": 1,
-      "command": "cat > prime.py << 'EOF'\ndef is_prime(n):\n    if n <= 1:\n        return False\n    if n == 2:\n        return True\n    if n % 2 == 0:\n        return False\n    for i in range(3, int(n**0.5) + 1, 2):\n        if n % i == 0:\n            return False\n    return True\nEOF"
+      "command": "python3 -c \"from prime import is_prime; assert is_prime(2)==True; assert is_prime(1)==False; assert is_prime(0)==False; assert is_prime(-1)==False; print('OK')\"",
+      "stdout": "OK\n",
+      "stderr": "",
+      "exit_code": 0
+    }
+  ],
+  "next_action": "accept",
+  "failure_type": null,
+  "needs_human_review": false,
+  "suggested_fix": "",
+  "criterion_results": [
+    {
+      "criterion": "运行 python3 -c \"from prime import is_prime; assert is_prime(2)==True; assert is_prime(1)==False; assert is_prime(0)==False; assert is_prime(-1)==False; print('OK')\" 输出 OK",
+      "passed": true,
+      "evidence": "命令 exit code 0，stdout 为 OK",
+      "risk": "high"
     },
     {
-      "stdout": "All tests passed!\n",
-      "stderr": "",
-      "exit_code": 0,
-      "command": "python3 -c \"from prime import is_prime; assert is_prime(0)==False; assert is_prime(1)==False; assert is_prime(2)==True; assert is_prime(3)==True; assert is_prime(4)==False; assert is_prime(17)==True; assert is_prime(97)==True; assert is_prime(100)==False; assert is_prime(-5)==False; print('All tests passed!')\""
+      "criterion": "无除零错误",
+      "passed": true,
+      "evidence": "代码中无除零操作，命令运行正常",
+      "risk": "medium"
     }
   ]
 }

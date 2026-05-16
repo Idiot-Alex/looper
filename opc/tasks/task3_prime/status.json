@@ -1,11 +1,12 @@
 {
-  "stage": "parse_error",
+  "stage": "success",
   "retry_count": 0,
-  "parse_retry_count": 1,
+  "parse_retry_count": 0,
   "session_id": "task3_prime",
   "completed_stages": [
     "manager",
-    "engineer"
+    "engineer",
+    "qa"
   ],
   "api_retry_count": 0
 }
