@@ -199,7 +199,7 @@ def build_engineer_prompt(
   "summary": "本轮改动摘要",
   "run_info": {
     "start_command": "uv run python output/flask_app/app.py",
-    "port": 5000,
+    "port": 8000,
     "language": "python"
   }
 }
@@ -207,7 +207,7 @@ def build_engineer_prompt(
 
 **`run_info` 字段说明**：
 - `start_command`：服务启动命令（CLI 脚本不需要启动命令可省略）。**必须简单直接**，统一用 `uv run python <文件路径>`（因为依赖装在 uv 虚拟环境中）。**不要生成 shell 脚本**，不要用 `&` 后台运行（Looper 自动管理后台进程）。
-- `port`：服务监听的端口号（CLI 脚本可省略）
+- `port`：服务监听的端口号（CLI 脚本可省略）。**不要用 5000**（macOS AirPlay 占用了 5000 端口），推荐 8000、8888、8080。
 - `language`：实现语言
 
 注意：

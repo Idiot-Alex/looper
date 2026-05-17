@@ -1,17 +1,18 @@
 {
-  "goal": "创建Flask项目，包含 / 和 /health 两个路由",
+  "goal": "在 output/flask_app/ 目录下创建一个 Flask 项目，包含 app.py 主文件，实现 / 返回 'Hello from Flask'，/health 返回 JSON {\"status\": \"ok\"}",
   "steps": [
-    "在 output/flask_app/ 目录创建 app.py 文件",
-    "编写 Flask 应用，定义 '/' 和 '/health' 路由",
-    "确保 app.py 可导入并运行"
+    "创建目录 output/flask_app/ (如果不存在)",
+    "在 output/flask_app/ 中创建 app.py 文件，内容包含 Flask 应用，定义 '/' 路由返回 'Hello from Flask'，'/health' 路由返回 JSON {\"status\": \"ok\"}",
+    "在 output/flask_app/ 中创建 requirements.txt 文件，写入 flask==3.0",
+    "安装依赖：cd output/flask_app && pip install -r requirements.txt"
   ],
   "acceptance_criteria": [
-    "GET / 响应状态码 200，返回 'Hello from Flask'",
-    "GET /health 响应状态码 200，返回 JSON 对象 {\"status\": \"ok\"}"
+    "GET 请求 http://localhost:XXX/ 返回纯文本 'Hello from Flask' (状态码 200)",
+    "GET 请求 http://localhost:XXX/health 返回 JSON 对象 {\"status\": \"ok\"} (Content-Type application/json，状态码 200)"
   ],
   "language": "python",
   "dependencies": [
     "flask==3.0"
   ],
-  "notes": "项目根目录为 output/flask_app/，主文件为 app.py。测试端口和启动命令由 Engineer 在 run_info 中指定。"
+  "notes": "端口和启动命令由 Engineer 在 run_info 中声明，Manager 不指定。项目根目录为 output/flask_app/。"
 }
