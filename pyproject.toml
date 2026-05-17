@@ -1,4 +1,7 @@
 [project]
 name = "flask-app"
 version = "0.1.0"
-dependencies = ["flask"]
+dependencies = [
+    "flask",
+    "textual>=8.2.6",
+]
