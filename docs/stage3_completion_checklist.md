@@ -144,6 +144,16 @@ uv run pytest tests/ -q
 
 ---
 
+---
+
+## 全能力验证（2026-05-17）
+
+| 能力 | 验证方式 | 结果 | 关键证据 |
+|:-----|:---------|:----:|:---------|
+| **read_file + edit_file** 改已有代码 | 给 `output/server.py` 新增 `/health` 端点，要求 Engineer 先读再改 | ✅ **success** (26s) | `🔧 工具调用: read_file(['path'])` → 精准输出修改后的 `output/server.py` |
+| **Manager 大循环** 3 次 retry → 换思路 | Flask 任务故意触发 3 次 retry → 2 次 replan | ✅ **replan × 2** | `replan_count: 2`，`MAX_MANAGER_REPLANS` 限流正确 |
+| **语言无关依赖** JS/Go/Rust | Node.js Express 项目，`npm install express` | ✅ **success** (39s) | `📦 安装 javascript 依赖: express` → `✅ express 安装成功` → QA 通过 |
+| **search_code + list_files** | Engineer 在多个任务中自调用 | ✅ **已实锤** | task1_flask: `list_files(['path','pattern'])`、多个 retry 中 `read_file` 等 |
 ## 发现并修复的隐藏 bug
 
 ### Bug: QA 解析失败时不写 retry_history
