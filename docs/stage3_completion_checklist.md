@@ -1,6 +1,6 @@
 # Stage 3 验收清单
 
-*最后更新：2026-05-14*
+*最后更新：2026-05-17*
 
 > 本文档逐项验证 Stage 3 各能力是否已实现。测试 → 证据 → 结论。
 
@@ -114,9 +114,48 @@ uv run pytest tests/ -q
 
 ---
 
+## 端到端验证：Flask 项目完整跑通（2026-05-17）
+
+**任务**：Flask 项目，`/` + `/health` 两个路由，多文件，`output/flask_app/` 目录
+
+**结果**：✅ **success**（21 秒）
+
+| 维度 | 状态 | 修复链 |
+|:-----|:-----|:-------|
+| Engineer 写代码到 `output/` | ✅ | 输出目录统一 |
+| `run_info` 声明端口 8000 | ✅ | 不用 5000（macOS AirPlay 占用）|
+| `start_command` 用 `uv run python` | ✅ | 禁止 shell 脚本 |
+| QA 一步审计 (DeepSeek) | ✅ | 21 秒内完成 |
+| 异步 MiniMax 审计 | ✅ | `qa_audit_minimax.txt` 写入 |
+| curl `--retry 3` | ✅ | Flask 启动时序宽容 |
+| `cleanup_background()` | ✅ | retry 间端口不冲突 |
+| QA JSON 正确解析 | ✅ | reason 内嵌 JSON 已转义 |
+
+---
+
 ## 发现并修复的隐藏 bug
 
 ### Bug: QA 解析失败时不写 retry_history
 **症状**：QA 输出 JSON 解析失败时，`handle_qa_result` 找不到 `qa_report.json`，直接走 `failed`，`_append_retry_history` 没被调用。
 
 **修复**：`run_qa` 在 JSON 解析失败时写入 fallback `qa_report.json`（`failure_type="qa_parse_error"`），让 `handle_qa_result` 正常处理。
+
+### Bug: macOS AirPlay 占用端口 5000
+**症状**：Flask 任务反复失败，curl 返回空响应。调试发现端口 5000 被系统 AirPlay Receiver 占用。
+
+**修复**：Engineer prompt 中明确标注「不要用 5000，推荐 8000、8888、8080」。
+
+### Bug: Engineer 生成 shell 脚本作 start_command
+**症状**：`run_info.start_command` 设为 `bash run.sh`，而 `run.sh` 用 `&` 后台起 Flask 后退出，cleanup_background 时误杀进程。
+
+**修复**：Engineer prompt 约束「不要生成 shell 脚本，不要用 `&`，统一用 `uv run python <文件>`」。
+
+### Bug: QA reason 字段内嵌 JSON 引号冲突
+**症状**：QA 输出 `"reason": "...返回 JSON {"status":"ok"}..."`，JSON 解析失败。
+
+**修复**：QA prompt 提示「reason 中含 JSON 内容时转义双引号为 `\"`」。
+
+### Bug: 裸 python 找不到 uv venv 中的 Flask
+**症状**：`start_command` 设为 `python app.py`，但 Flask 装在 uv 虚拟环境中。
+
+**修复**：Engineer prompt 统一要求 `uv run python`。
