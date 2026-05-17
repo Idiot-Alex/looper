@@ -200,65 +200,57 @@ class LooperTUI(App):
         ).start()
 
     def _run_looper(self, session_id: str, task: str) -> None:
-        """后台执行 Looper"""
-        start_time = time.time()
-        try:
-            result = subprocess.run(
-                ["uv", "run", "python", "-m", "opc.main"],
-                capture_output=True, text=True, timeout=300,
-            )
-        except subprocess.TimeoutExpired:
-            self.call_from_thread(self._log, "⏰ 任务执行超时（300s）")
-            self.call_from_thread(self._task_done, False)
-            return
-
-        duration = time.time() - start_time
-        # 全局重置
+        """后台执行 Looper（实时流式输出）"""
         global _WRITTEN_FILES, _GIT_SNAPSHOT
         _WRITTEN_FILES = []
         _GIT_SNAPSHOT = ""
 
-        # 解析输出行
-        lines = []
-        for line in result.stdout.split("\n"):
-            summary = summarize_line(line)
-            if summary:
-                lines.append(summary)
+        start_time = time.time()
+        stdout_lines = []
+
+        proc = subprocess.Popen(
+            ["uv", "run", "python", "-m", "opc.main"],
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            text=True, bufsize=1,
+        )
 
         try:
-            self.call_from_thread(self._display_results, lines, duration)
+            for line in iter(proc.stdout.readline, ""):
+                stdout_lines.append(line)
+                summary = summarize_line(line)
+                if summary:
+                    try:
+                        self.call_from_thread(self._log, summary)
+                    except Exception:
+                        pass
+            proc.wait(timeout=300)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            try:
+                self.call_from_thread(self._log, "⏰ 任务执行超时（300s）")
+                self.call_from_thread(self._task_done, False)
+            except Exception:
+                pass
+            return
+
+        duration = time.time() - start_time
+        all_text = "".join(stdout_lines)
+
+        try:
+            success = "🎉 任务成功" in all_text
+            failed = "❌" in all_text and ("重试次数超限" in all_text or "大循环次数超限" in all_text)
+
+            self.call_from_thread(self._log, f"⏱️ 耗时: {duration:.0f}s")
+            if _WRITTEN_FILES:
+                self.call_from_thread(self._log, "📁 输出文件:")
+                for f in _WRITTEN_FILES:
+                    self.call_from_thread(self._log, f"   📄 {f}")
+            if _GIT_SNAPSHOT:
+                self.call_from_thread(self._log, f"📸 Git 快照: {_GIT_SNAPSHOT}")
+            self.call_from_thread(self._log, "📊 查看历史报告: open opc/logs/dashboard.html")
+            self.call_from_thread(self._task_done, success if not failed else False)
         except Exception:
             pass
-
-    def _display_results(self, lines: list, duration: float) -> None:
-        """显示执行结果"""
-        for line in lines:
-            self._log(line)
-
-        all_text = "\n".join(lines)
-
-        # 判断成败
-        success = "🎉 任务成功" in all_text
-        failed = "❌ 任务失败" in all_text or "重试次数超限" in all_text
-
-        # 输出信息
-        self._log(f"⏱️ 耗时: {duration:.0f}s")
-
-        # 显示输出文件清单
-        if _WRITTEN_FILES:
-            self._log("📁 输出文件:")
-            for f in _WRITTEN_FILES:
-                self._log(f"   📄 {f}")
-            self._log(f"   📂 output/ 目录")
-
-        # Git 快照
-        if _GIT_SNAPSHOT:
-            self._log(f"📸 Git 快照: {_GIT_SNAPSHOT}")
-
-        # 查看报告
-        self._log("📊 查看历史报告: open opc/logs/dashboard.html")
-
-        self._task_done(success if not failed else False)
 
     def _task_done(self, success: bool) -> None:
         """任务结束"""
