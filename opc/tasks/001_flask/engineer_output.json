@@ -1,0 +1,18 @@
+{
+  "files": [
+    {
+      "path": "flask_app/app.py",
+      "content": "from flask import Flask\n\napp = Flask(__name__)\n\n@app.route('/')\ndef hello():\n    return 'Hello World'\n\n@app.route('/health')\ndef health():\n    return 'OK'\n\nif __name__ == '__main__':\n    app.run(host='0.0.0.0', port=5000, debug=False)\n"
+    },
+    {
+      "path": "flask_app/requirements.txt",
+      "content": "Flask\ngunicorn\n"
+    }
+  ],
+  "summary": "修复服务响应失败问题：在requirements.txt中添加gunicorn依赖，确保gunicorn可用于启动服务；app.py代码已正确实现两个路由，无需修改。",
+  "run_info": {
+    "start_command": "gunicorn -w 1 -b 0.0.0.0:5000 app:app",
+    "port": 5000,
+    "language": "python"
+  }
+}

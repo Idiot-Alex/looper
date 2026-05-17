@@ -89,7 +89,7 @@ def call_qa(messages: list) -> str:
     return client.chat(messages)
 
 
-def call_qa_formatter(messages: list) -> str:
-    """调用 DeepSeek 将分析报告格式化为严格 JSON"""
-    client = create_deepseek_client()
-    return client.chat(messages)
+# call_qa_formatter 已合并到主路径，不再单独调用。
+# def call_qa_formatter(messages: list) -> str:
+#     client = create_deepseek_client()
+#     return client.chat(messages)

@@ -25,7 +25,7 @@ from opc.queue import (
     is_command_executed, mark_command_executed,
     is_file_written, mark_file_written,
 )
-from opc.llm import call_manager, call_engineer, call_qa, call_qa_formatter
+from opc.llm import call_manager, call_engineer, call_qa
 from opc.parser import (
     parse_json_safe, parse_json_strict,
     validate_manager_output, validate_engineer_output,
@@ -45,7 +45,7 @@ from opc.logger import (
 )
 from opc.prompts import (
     build_manager_prompt, build_engineer_prompt,
-    build_qa_prompt, build_qa_analysis_prompt, build_qa_format_prompt,
+    build_qa_prompt, build_qa_analysis_prompt, build_qa_deepseek_prompt,
     infer_task_type,
 )
 from opc.config import SESSION_TIMEOUT_SECONDS
@@ -645,46 +645,43 @@ def run_qa(status: dict) -> tuple[bool, str]:
         except Exception:
             pass  # 源码不可用时继续
 
-    # === 两阶段 QA 流程 ===
-    # 阶段1：MiniMax 做自由格式分析（无 parse_error 风险）
-    analysis_prompt = build_qa_analysis_prompt(task_data, evidence, source_code, run_info)
-    log_prompt(session_id, "qa_analysis", analysis_prompt, 0)
+    # === QA 主流程（DeepSeek 一步完成：分析 + JSON）===
+    qa_prompt = build_qa_deepseek_prompt(task_data, evidence, source_code, run_info)
+    log_prompt(session_id, "qa", qa_prompt, 0)
 
-    print("🤖 QA 分析 (MiniMax)...")
+    print("🤖 QA 审计 (DeepSeek)...")
     try:
-        raw_analysis = call_qa([{"role": "user", "content": analysis_prompt}])
-        log_llm_call(session_id, "qa", "MiniMax-M2.5", success=True, stage="qa_analysis")
+        raw_output = call_engineer([{"role": "user", "content": qa_prompt}])
+        log_llm_call(session_id, "qa", DEEPSEEK_MODEL, success=True, stage="qa")
     except Exception as e:
-        print(f"❌ QA 分析失败: {e}")
-        log_llm_call(session_id, "qa", "MiniMax-M2.5", success=False, error=str(e), stage="qa_analysis")
+        print(f"❌ QA 调用失败: {e}")
+        log_llm_call(session_id, "qa", DEEPSEEK_MODEL, success=False, error=str(e), stage="qa")
         return False, "api_error"
 
-    log_raw_output(session_id, "qa_analysis", raw_analysis, 0)
+    log_raw_output(session_id, "qa", raw_output, 0)
 
-    # 阶段2：DeepSeek 将分析报告格式化为严格 JSON
-    format_prompt = build_qa_format_prompt(raw_analysis, task_data)
-    log_prompt(session_id, "qa_format", format_prompt, 0)
+    # === 异步 MiniMax 审计（不阻塞）===
+    def _do_minimax_audit():
+        try:
+            ap = build_qa_analysis_prompt(task_data, evidence, source_code, run_info)
+            mr = call_qa([{"role": "user", "content": ap}])
+            audit_file = session_dir / "qa_audit_minimax.txt"
+            audit_file.write_text(mr, encoding="utf-8")
+            print(f"📋 MiniMax 审计完成 → {audit_file}")
+        except Exception as e:
+            print(f"⚠️ MiniMax 审计失败: {e}")
 
-    print("🤖 QA 格式化 (DeepSeek)...")
-    try:
-        raw_json = call_qa_formatter([{"role": "user", "content": format_prompt}])
-        log_llm_call(session_id, "qa", DEEPSEEK_MODEL, success=True, stage="qa_format")
-    except Exception as e:
-        print(f"❌ QA 格式化失败: {e}")
-        log_llm_call(session_id, "qa", DEEPSEEK_MODEL, success=False, error=str(e), stage="qa_format")
-        # DeepSeek 失败时才退回到 fallback（异常情况，不是解析失败）
-        return False, "api_error"
+    import threading
+    threading.Thread(target=_do_minimax_audit, daemon=True).start()
 
-    log_raw_output(session_id, "qa_format", raw_json, 0)
-
-    # 解析 JSON（DeepSeek 格式化的，很少失败）
-    data = parse_json_safe(raw_json)
+    # 解析 JSON（DeepSeek 几乎从不失败）
+    data = parse_json_safe(raw_output)
     if data is None:
-        print("❌ QA 格式化输出 JSON 解析失败")
-        log_parse_error(session_id, "qa_format", raw_json, 0)
+        print("❌ QA 输出 JSON 解析失败")
+        log_parse_error(session_id, "qa", raw_output, 0)
         fallback_qa = {
             "passed": False,
-            "reason": f"DeepSeek 格式化为 JSON 失败。原始分析摘要: {raw_analysis[:300]}",
+            "reason": f"DeepSeek QA JSON 解析失败。原始输出: {raw_output[:300]}",
             "failure_type": "qa_parse_error",
             "evidence": evidence,
         }

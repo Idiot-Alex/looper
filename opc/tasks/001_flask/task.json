@@ -1,0 +1,18 @@
+{
+  "goal": "创建 Flask 项目，包含 / 和 /health 两个路由",
+  "steps": [
+    "Step 1: 创建 flask_app 目录，并生成 app.py 文件，确保代码中含有两个路由（/ 返回 'Hello World'，/health 返回 'OK'），且 app.run 绑定 0.0.0.0:5000，并设置 debug=False 避免自动重载干扰测试",
+    "Step 2: 生成 requirements.txt，仅包含 Flask 依赖",
+    "Step 3: 使用 pip install -r requirements.txt 安装依赖",
+    "Step 4: 使用 gunicorn -w 1 -b 0.0.0.0:5000 app:app 在后台启动服务（替换直接 python app.py，避免子进程阻塞或端口未及时打开）",
+    "Step 5: 等待服务端口就绪（循环检测 curl -s -o /dev/null -w '%{http_code}' http://localhost:5000/ 直到返回 200），确保服务完全启动",
+    "Step 6: 依次测试 / 和 /health 两个路由，验证返回内容与预期一致",
+    "Step 7: 停止 gunicorn 服务"
+  ],
+  "acceptance_criteria": [
+    "curl http://localhost:5000/ 返回 'Hello World' 且 HTTP 状态码为 200",
+    "curl http://localhost:5000/health 返回 'OK' 且 HTTP 状态码为 200",
+    "服务启动后 3 秒内能够响应请求"
+  ],
+  "notes": "避免之前的失败原因：1）不再使用 app.run(debug=True) 或直接运行 python app.py，因为这种方式可能因日志输出、线程阻塞导致 curl 无法抓到响应。改用 gunicorn 作为生产级 WSGI 服务器，确保后台稳定运行。2）增加端口就绪等待机制，防止 curl 在服务未完全启动时测试。3）确保 Flask 路由函数返回字符串而非 None 或空响应。4）测试前后清理进程，避免端口冲突。5）所有步骤在同一个 shell 会话中顺序执行，避免环境变量丢失。"
+}

@@ -1,0 +1,25 @@
+[
+  {
+    "failure_type": "runtime_error",
+    "qa_summary": "代码编写正确，但执行结果中 curl 标准输出为空，退出码为0，表明 Flask 服务可能未实际运行或响应被拦截，导致验收标准无法通过执行验证。",
+    "files_written": [
+      "output/flask_app/app.py"
+    ]
+  },
+  {
+    "failure_type": "runtime_error",
+    "qa_summary": "服务未响应，/和/health路由均返回空响应，缺少pytest测试结果",
+    "files_written": [
+      "output/flask_app/app.py",
+      "output/flask_app/test_app.py"
+    ]
+  },
+  {
+    "failure_type": "runtime_error",
+    "qa_summary": "两个curl命令的标准输出均为空，未返回预期的'Hello World'或'OK'，HTTP状态码未知，服务可能未正常运行。",
+    "files_written": [
+      "flask_app/requirements.txt",
+      "flask_app/app.py"
+    ]
+  }
+]

@@ -666,44 +666,75 @@ def build_qa_analysis_prompt(
     return prompt
 
 
-def build_qa_format_prompt(raw_analysis: str, task_json: dict) -> str:
-    """构建 DeepSeek 格式化 prompt——将分析报告转为严格 JSON"""
+def build_qa_deepseek_prompt(
+    task_json: dict,
+    evidence: list,
+    source_code: Optional[dict] = None,
+    run_info: Optional[dict] = None,
+) -> str:
+    """构建 DeepSeek QA prompt——一步完成：分析证据 + 输出严格 JSON（主路径）
+    
+    合并了旧版 build_qa_analysis_prompt + build_qa_format_prompt 的功能，
+    由 DeepSeek 一次完成，延迟减半。
+    """
+    prompt = f"""# QA 审计任务
+
+你是 QA 审计员。请分析以下执行结果，判断是否满足验收标准。
+
+## 任务目标
+
+{task_json.get('goal', '')}
+
+## 验收标准
+
+"""
+    for criteria in task_json.get("acceptance_criteria", []):
+        prompt += f"- {criteria}\n"
+
+    prompt += "\n## 执行结果\n\n"
+    for i, ev in enumerate(evidence or [], 1):
+        if isinstance(ev, dict):
+            prompt += f"### 命令 {i}: {ev.get('command', 'N/A')}\n"
+            prompt += f"- 退出码: {ev.get('exit_code', 'N/A')}\n"
+            prompt += f"- 标准输出: {ev.get('stdout', '')[:500]}\n"
+            prompt += f"- 错误输出: {ev.get('stderr', '')[:500]}\n\n"
+
+    if run_info and run_info.get("port"):
+        prompt += f"## 服务信息\nEngineer 声明服务在端口 {run_info['port']} 上运行。\n\n"
+
     deps = task_json.get("dependencies", [])
-    deps_check = ""
     if deps:
-        deps_check = f'\n依赖检查: {"、".join(deps)}。如分析报告中提到包未安装，这是一个 runtime_error。'
+        prompt += f"## 依赖检查\n所需依赖: {', '.join(deps)}\n\n"
 
-    prompt = f"""# JSON 格式化任务
+    if source_code:
+        prompt += "## Engineer 源码\n\n"
+        for path, content in source_code.items():
+            prompt += f"### {path}\n```\n{content[:1500]}\n```\n\n"
 
-请将以下分析报告格式化为严格的 JSON。
+    prompt += """## 输出要求
 
-## 原始分析报告
-
-{raw_analysis}
-
-## 输出要求
-
-请严格按照以下 schema 输出一个 JSON 对象，不要输出任何其他文字：
+你必须输出以下格式的严格 JSON。**只输出 JSON，不要加任何其他文字，不要用 markdown 代码块包裹。**
 
 ```json
-{{{deps_check}
-  "passed": true/false,
-  "failure_type": "test_failure|compile_error|timeout|runtime_error|unknown",
-  "reason": "根据分析报告提炼的判定理由",
+{
+  "passed": true,
+  "failure_type": "test_failure | compile_error | timeout | runtime_error | unknown",
+  "reason": "判定理由，说明为什么通过或为什么失败",
   "criterion_results": [
-    {{"criterion": "验收标准原文", "passed": true/false, "evidence": "证据摘要"}}
+    {"criterion": "验收标准原文", "passed": true, "evidence": "判定依据"}
   ],
-  "risk_level": "high|medium|low",
-  "needs_human_review": true/false,
-  "suggested_fix": "建议修复方向（失败时必填）"
-}}
+  "risk_level": "high | medium | low",
+  "needs_human_review": false
+}
 ```
 
-**规则**：
-- passed: 所有验收标准通过 → true；有任何未通过 → false
-- failure_type: 根据原始分析中的失败原因选择最匹配的类型
-- criterion_results: 每个验收标准一条，客观依据来自分析报告
-- suggested_fix: 失败时必填，建议具体的代码修改方向
-- 只输出 JSON，不要 markdown 代码块，不要任何解释文字
+failure_type 取值：
+- test_failure: 测试命令执行失败
+- compile_error: 代码语法错误
+- timeout: 命令超时
+- runtime_error: 运行时崩溃
+- unknown: 原因不明
+
+请在 reason 字段中具体说明哪些验收标准通过了、哪些没通过、为什么。
 """
     return prompt
