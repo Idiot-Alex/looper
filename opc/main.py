@@ -328,12 +328,30 @@ def run_engineer(status: dict, is_retry: bool = False) -> tuple[bool, str]:
         with open(qa_file, "r", encoding="utf-8") as f:
             qa_report = json.load(f)
 
+    # 重试时加载上一次的源码，让 Engineer 不必多一轮 read_file（问题三）
+    project_files = None
+    if is_retry:
+        eng_file = session_dir / "engineer_output.json"
+        if eng_file.exists():
+            try:
+                with open(eng_file, encoding="utf-8") as f:
+                    prev = json.load(f)
+                project_files = {
+                    p["path"]: p.get("content", "")
+                    for p in prev.get("files", [])
+                    if p.get("content")
+                }
+            except Exception:
+                pass
+
     # 工具调用循环（Stage 2.5）
     from opc.tools import get_registry
 
     role_name = "engineer_retry" if is_retry else "engineer"
     messages = [
-        {"role": "user", "content": build_engineer_prompt(task_data, qa_report)}
+        {"role": "user", "content": build_engineer_prompt(
+            task_data, qa_report, project_files=project_files
+        )}
     ]
     max_tool_calls = 10  # 防止无限循环
     tool_call_count = 0
@@ -519,11 +537,43 @@ def run_qa(status: dict) -> tuple[bool, str]:
         status["stage"] = "failed"
         return False, "timeout"
     
-    # 先执行 background_commands
-    background_commands = task_data.get("background_commands", [])
-    health_port = task_data.get("health_check_port")
+    # 从 Engineer 的 engineer_output.json 读取 run_info（问题二）
+    # fallback: 没有 run_info 时退回到 task.json 的旧字段
+    background_commands = []
+    health_port = None
+    startup_wait = 10
+    test_commands = task_data.get("test_commands", [])
+    run_info = {}  # Engineer 的 run_info（提供给 QA analysis prompt 使用）
+
+    eng_file = session_dir / "engineer_output.json"
+    if eng_file.exists():
+        try:
+            with open(eng_file, encoding="utf-8") as f:
+                eng_data = json.load(f)
+            run_info = eng_data.get("run_info", {}) or {}
+            if run_info.get("start_command"):
+                background_commands = [run_info["start_command"]]
+            if run_info.get("port"):
+                health_port = run_info["port"]
+                # port 存在 → 自动构造 curl 测试命令
+                if not test_commands:
+                    test_commands = [
+                        f"curl -s http://localhost:{run_info['port']}/",
+                        f"curl -s http://localhost:{run_info['port']}/health",
+                    ]
+        except Exception:
+            pass
+
+    # fallback: 没有 run_info 时用 Manager 的旧字段
+    if not background_commands:
+        background_commands = task_data.get("background_commands", [])
+    if not health_port:
+        health_port = task_data.get("health_check_port")
+    if not test_commands:
+        test_commands = task_data.get("test_commands", [])
     startup_wait = task_data.get("startup_wait_seconds", 10)
-    
+
+    # 执行 background_commands
     if background_commands:
         print(f"🚀 启动后台进程: {len(background_commands)} 个")
         if health_port:
@@ -538,9 +588,8 @@ def run_qa(status: dict) -> tuple[bool, str]:
             )
         except Exception as e:
             print(f"⚠️ 后台启动失败: {e}")
-    
+
     # 执行 test_commands（回放保护：跳过已执行命令）
-    test_commands = task_data.get("test_commands", [])
     if test_commands:
         print(f"🧪 执行测试命令: {len(test_commands)} 个")
         try:
@@ -598,7 +647,7 @@ def run_qa(status: dict) -> tuple[bool, str]:
 
     # === 两阶段 QA 流程 ===
     # 阶段1：MiniMax 做自由格式分析（无 parse_error 风险）
-    analysis_prompt = build_qa_analysis_prompt(task_data, evidence, source_code)
+    analysis_prompt = build_qa_analysis_prompt(task_data, evidence, source_code, run_info)
     log_prompt(session_id, "qa_analysis", analysis_prompt, 0)
 
     print("🤖 QA 分析 (MiniMax)...")
@@ -765,6 +814,8 @@ def handle_qa_result(status: dict) -> None:
 
         if retry_count < MAX_RETRIES:
             status["stage"] = "engineer_retry"
+            # 杀后台进程，释放端口，避免 retry 之间端口冲突（问题一）
+            cleanup_background()
             # 关键修复：清空 completed_stages 让 Engineer 重新运行
             # 否则 completed_stages 中的 'engineer' 会导致 Engineer 阶段被跳过
             status["completed_stages"] = ["manager"]

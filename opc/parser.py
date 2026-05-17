@@ -108,6 +108,14 @@ def validate_engineer_output(data: dict) -> bool:
         if "path" not in f or "content" not in f:
             return False
 
+    # run_info 可选验证
+    run_info = data.get("run_info")
+    if run_info:
+        if not isinstance(run_info, dict):
+            return False
+        if run_info.get("port") and not isinstance(run_info["port"], int):
+            return False
+
     return True
 
 

@@ -71,10 +71,6 @@ def build_manager_prompt(
   "goal": "本次任务目标",
   "steps": ["步骤1", "步骤2", "..."],
   "acceptance_criteria": ["验收标准1", "验收标准2", "..."],
-  "background_commands": ["需要后台启动的命令"],
-  "test_commands": ["前台验证命令"],
-  "startup_wait_seconds": 启动最大等待秒数,
-  "health_check_port": 服务端口号,
   "language": "python / javascript / typescript / go / rust / shell / other",
   "dependencies": ["包名列表，无需依赖则为空数组"],
   "notes": "其他约束或提示"
@@ -84,16 +80,7 @@ def build_manager_prompt(
 **字段说明**：
 - `language`：项目实现语言。如不确定可以从 `python / javascript / typescript / go / rust / shell / other` 选一个最接近的
 - `dependencies`：需要的第三方依赖包名。Python 用 `pip install flask==3.0` 格式，JS 用 npm 包名
-- `background_commands`：后台命令用 `&` 结尾，如 `python3 server.py &`
-- `health_check_port`：服务端口号（必须设置），Runner 会先探端口再执行测试
-- `startup_wait_seconds`：端口探测的最大超时秒数，默认 10
-- `test_commands`：用 `curl` 验证的命令
-
-**注意**：
-- `background_commands` 先执行
-- Runner 等待 `startup_wait_seconds` 后执行 `test_commands`
-- 命令要写完整（如 `node src/index.js`，不是 `npm start`）
-- 所有生成的文件放在 `output/` 目录下，除非需求明确指定其他路径
+- **Manager 不再指定端口和测试命令**——这些由 Engineer 在 `run_info` 中声明，QA 根据 `run_info` 自行构造测试命令。
 
 请直接输出 JSON：
 """
@@ -209,9 +196,19 @@ def build_engineer_prompt(
       "content": "完整文件内容..."
     }
   ],
-  "summary": "本轮改动摘要"
+  "summary": "本轮改动摘要",
+  "run_info": {
+    "start_command": "python flask_app/app.py",
+    "port": 5000,
+    "language": "python"
+  }
 }
 ```
+
+**`run_info` 字段说明**：
+- `start_command`：服务启动命令（CLI 脚本不需要启动命令可省略）
+- `port`：服务监听的端口号（CLI 脚本可省略）
+- `language`：实现语言
 
 注意：
 - 可以多次调用工具（每次一个）
@@ -615,6 +612,7 @@ def build_qa_analysis_prompt(
     task_json: dict,
     evidence: list,
     source_code: Optional[dict] = None,
+    run_info: Optional[dict] = None,
 ) -> str:
     """构建 MiniMax 分析 prompt——自由格式分析，不要求 JSON"""
     prompt = f"""# QA 分析任务
@@ -643,6 +641,11 @@ def build_qa_analysis_prompt(
     deps = task_json.get("dependencies", [])
     if deps:
         prompt += f"## 依赖检查\n所需依赖: {', '.join(deps)}\n请分析这些包是否已正确安装。\n\n"
+
+    # run_info（Engineer 声明的端口和启动方式）
+    if run_info:
+        if run_info.get("port"):
+            prompt += f"## 服务信息\nEngineer 声明服务在端口 {run_info['port']} 上运行。\n\n"
 
     if source_code:
         prompt += "## Engineer 源码\n\n"
