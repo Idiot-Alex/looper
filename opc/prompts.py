@@ -736,5 +736,6 @@ failure_type 取值：
 - unknown: 原因不明
 
 请在 reason 字段中具体说明哪些验收标准通过了、哪些没通过、为什么。
+**注意**：如果 reason 中包含 JSON 内容（如响应体），请转义内部双引号为 `\"`，避免破坏整体 JSON 结构。
 """
     return prompt

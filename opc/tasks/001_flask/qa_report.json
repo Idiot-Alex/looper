@@ -1,19 +1,19 @@
 {
   "passed": false,
-  "failure_type": "test_failure",
-  "reason": "两个curl命令均返回空输出，未能验证'/health'返回JSON及'/'返回纯文本。退出码为0但无响应体，服务可能未正确启动或端口被占用，验收标准未通过。",
-  "criterion_results": [
+  "reason": "DeepSeek QA JSON 解析失败。原始输出: {\n  \"passed\": true,\n  \"failure_type\": \"unknown\",\n  \"reason\": \"所有验收标准均通过：curl GET / 返回 'Hello from Flask'，curl GET /health 返回 JSON {\"status\":\"ok\"}，项目文件位于 output/flask_app/app.py。\",\n  \"criterion_results\": [\n    {\n      \"criterion\": \"GET 请求 http://<host>:<port>/ 返回内容为 'Hello from Flask'\",\n      \"passed",
+  "failure_type": "qa_parse_error",
+  "evidence": [
     {
-      "criterion": "GET请求 http://localhost:XXX/ 返回纯文本 'Hello from Flask' (状态码200)",
-      "passed": false,
-      "evidence": "curl返回空输出，无法确认内容"
+      "stdout": "Hello from Flask",
+      "stderr": "",
+      "exit_code": 0,
+      "command": "curl -s --retry 3 --retry-delay 1 http://localhost:8000/"
     },
     {
-      "criterion": "GET请求 http://localhost:XXX/health 返回JSON对象 {\"status\":\"ok\"} (Content-Type application/json，状态码200)",
-      "passed": false,
-      "evidence": "curl返回空输出，无法确认内容与Content-Type"
+      "stdout": "{\"status\":\"ok\"}\n",
+      "stderr": "",
+      "exit_code": 0,
+      "command": "curl -s --retry 3 --retry-delay 1 http://localhost:8000/health"
     }
-  ],
-  "risk_level": "medium",
-  "needs_human_review": true
+  ]
 }

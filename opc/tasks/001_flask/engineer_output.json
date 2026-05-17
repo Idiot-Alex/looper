@@ -2,17 +2,13 @@
   "files": [
     {
       "path": "output/flask_app/app.py",
-      "content": "from flask import Flask, jsonify\n\napp = Flask(__name__)\n\n@app.route('/')\ndef hello():\n    return 'Hello from Flask'\n\n@app.route('/health')\ndef health():\n    return jsonify({\"status\": \"ok\"})\n\nif __name__ == '__main__':\n    app.run(host='0.0.0.0', port=5000)\n"
-    },
-    {
-      "path": "output/flask_app/requirements.txt",
-      "content": "flask==3.0\n"
+      "content": "from flask import Flask, jsonify\n\napp = Flask(__name__)\n\n@app.route('/')\ndef hello():\n    return 'Hello from Flask'\n\n@app.route('/health')\ndef health():\n    return jsonify({\"status\": \"ok\"})\n\nif __name__ == '__main__':\n    app.run(host='0.0.0.0', port=8000)\n"
     }
   ],
-  "summary": "代码已满足所有验收标准，无需修改。QA 失败可能是环境或启动问题，已确保文件正确。",
+  "summary": "在 output/flask_app/ 目录下创建了 Flask 应用 app.py，包含 / 路由返回 'Hello from Flask' 和 /health 路由返回 JSON {\"status\": \"ok\"}。使用端口 8000，启动命令为 uv run python output/flask_app/app.py。依赖 flask==3.0 需提前安装。",
   "run_info": {
     "start_command": "uv run python output/flask_app/app.py",
-    "port": 5000,
+    "port": 8000,
     "language": "python"
   }
 }
