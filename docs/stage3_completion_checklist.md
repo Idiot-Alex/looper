@@ -79,7 +79,7 @@
 | 1 | Flask 项目（`/` + `/health`，多文件） | 多文件、第三方依赖、端口声明 | ✅ **success** | 21s | port 5000 被 macOS AirPlay 占用→改 8000；Engineer 不再生成 shell 脚本 |
 | 2 | CLI hello world（向后兼容） | 无服务任务、无端口、单文件 | ✅ **success** | 30s | Manager 不输出 `background_commands` → QA 自动 fallback |
 | 3 | 难任务（触发大循环） | 3次retry → Manager replan | ✅ **replan × 2** | — | `replan_count: 2` 确认，`MAX_MANAGER_REPLANS` 限流正确 |
-| 4 | 首页 HTML 设计（human_gate） | 主观审美、CSS 动画、深色主题 | ✅ **success** | ~60s | QA 直接通过，`needs_human_review` 未被触发 |
+| 4 | 首页 HTML 设计（human_gate） | 主观审美、手动触发审批 | ✅ **success** | ~60s | QA 不主动标记；手动设 `needs_human_review=true` 后状态机正常运行 ✅✅ 两条路径: y→success, n→failed |
 
 **数据来源**：001_flask、001_hello、task4_index 等 session 的实际运行记录。
 
