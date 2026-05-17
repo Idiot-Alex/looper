@@ -24,31 +24,50 @@ PATTERNS = {
     "🔧 工具调用: list_files": "📂 list_files",
     "🔧 工具调用: edit_file": "✂️ edit_file",
     "🔧 工具调用: search_code": "🔍 search_code",
-    "✅ 写入文件:": "✅ 写入:",
     "🚀 启动后台进程": "🚀 启动服务",
     "🧪 执行测试命令": "🧪 测试中",
     "🤖 QA 审计": "🤖 QA 审计 (DeepSeek)...",
-    "🎉 任务成功完成": "🎉 任务成功！",
-    "📸 Git 快照创建": "📸 Git 快照",
     "❌ 重试次数超限": "❌ 任务失败",
     "❌ 大循环次数超限": "❌ 任务失败",
     "⚠️ 命令 stdout 为空": "⚠️ 服务未就绪",
 }
 
+_WRITTEN_FILES: list[str] = []   # 记录本次任务写了哪些文件
+_GIT_SNAPSHOT: str = ""          # Git 快照哈希
+
 
 def summarize_line(line: str) -> str:
-    """将 OPC 原始输出行转为 TUI 状态行"""
+    """将 OPC 原始输出行转为 TUI 状态行，同时收集关键信息"""
+    global _WRITTEN_FILES, _GIT_SNAPSHOT
+
+    # 捕获文件写入信息
+    m = re.match(r"✅ 写入文件: (.+)", line)
+    if m:
+        _WRITTEN_FILES.append(m.group(1).strip())
+        # 只显示文件名，不显示路径
+        return f"✅ 写入: {m.group(1).strip()}"
+
+    # 捕获 Git 快照
+    m = re.search(r"📸 Git 快照创建: (\w+)", line)
+    if m:
+        _GIT_SNAPSHOT = m.group(1)
+        return f"📸 Git 快照: {_GIT_SNAPSHOT}"
+
+    # 逐条匹配 PATTERNS
     for pattern, summary in PATTERNS.items():
         if pattern in line:
             return summary
-    # 特殊处理 QA 判定行
+
+    # QA 判定
     if "QA 判定" in line:
-        if "✅" in line:
+        if "✅" in line or "均通过" in line or "均已满足" in line:
             return "✅ QA 通过"
         return "❌ QA 未通过"
+
     # 端口探测
     if "端口探测" in line and "已就绪" in line:
         return "✅ 端口就绪"
+
     # 普通行直接显示
     stripped = line.strip()
     if stripped and not stripped.startswith("="):
@@ -194,6 +213,11 @@ class LooperTUI(App):
             return
 
         duration = time.time() - start_time
+        # 全局重置
+        global _WRITTEN_FILES, _GIT_SNAPSHOT
+        _WRITTEN_FILES = []
+        _GIT_SNAPSHOT = ""
+
         # 解析输出行
         lines = []
         for line in result.stdout.split("\n"):
@@ -210,21 +234,31 @@ class LooperTUI(App):
         """显示执行结果"""
         for line in lines:
             self._log(line)
-            if "🎉 任务成功" in line:
-                self._task_done(True)
-            elif "失败" in line and ("重试" not in line and "审计" not in line):
-                pass  # 继续看最终状态
 
-        # 检查最终状态行
-        all_text = " ".join(lines)
-        if "🎉 任务成功" in all_text:
-            self._task_done(True)
-        elif "❌ 任务失败" in all_text or "任务失败" in all_text:
-            self._task_done(False)
-        else:
-            # 看退出码
-            self._log(f"⏱️ 耗时: {duration:.0f}s")
-            self._task_done(True)  # 默认标记完成
+        all_text = "\n".join(lines)
+
+        # 判断成败
+        success = "🎉 任务成功" in all_text
+        failed = "❌ 任务失败" in all_text or "重试次数超限" in all_text
+
+        # 输出信息
+        self._log(f"⏱️ 耗时: {duration:.0f}s")
+
+        # 显示输出文件清单
+        if _WRITTEN_FILES:
+            self._log("📁 输出文件:")
+            for f in _WRITTEN_FILES:
+                self._log(f"   📄 {f}")
+            self._log(f"   📂 output/ 目录")
+
+        # Git 快照
+        if _GIT_SNAPSHOT:
+            self._log(f"📸 Git 快照: {_GIT_SNAPSHOT}")
+
+        # 查看报告
+        self._log("📊 查看历史报告: open opc/logs/dashboard.html")
+
+        self._task_done(success if not failed else False)
 
     def _task_done(self, success: bool) -> None:
         """任务结束"""
@@ -235,6 +269,7 @@ class LooperTUI(App):
         else:
             self.fail_count += 1
             self._log("❌ 任务失败")
+        self._log("─" * 50)
         self._update_stats()
         self.query_one("#stat-status", Static).update("⚡ 状态: 空闲")
         self.query_one("#task-input", Input).focus()
