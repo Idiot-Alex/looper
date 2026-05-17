@@ -1,25 +1,27 @@
 [
   {
-    "failure_type": "runtime_error",
-    "qa_summary": "代码编写正确，但执行结果中 curl 标准输出为空，退出码为0，表明 Flask 服务可能未实际运行或响应被拦截，导致验收标准无法通过执行验证。",
+    "failure_type": "test_failure",
+    "qa_summary": "两个 curl 命令均返回退出码 0，但标准输出为空，说明 Flask 服务未能正确返回预期的响应。虽然源码逻辑正确，但执行时服务可能未启动、端口未监听或存在其他运行时问题，导致根路径返回空而非 'Hello from Flask'，/health 返回空而非 JSON 对象。因此验收标准均未通过。",
     "files_written": [
       "output/flask_app/app.py"
     ]
   },
   {
-    "failure_type": "runtime_error",
-    "qa_summary": "服务未响应，/和/health路由均返回空响应，缺少pytest测试结果",
+    "failure_type": "test_failure",
+    "qa_summary": "两条 curl 命令均返回空输出，未返回预期的字符串或 JSON，表明 Flask 应用未正确响应请求。可能原因：应用代码缺失或路由配置错误。",
     "files_written": [
+      "output/flask_app/requirements.txt",
       "output/flask_app/app.py",
-      "output/flask_app/test_app.py"
+      "output/flask_app/run.sh"
     ]
   },
   {
-    "failure_type": "runtime_error",
-    "qa_summary": "两个curl命令的标准输出均为空，未返回预期的'Hello World'或'OK'，HTTP状态码未知，服务可能未正常运行。",
+    "failure_type": "test_failure",
+    "qa_summary": "两个 curl 命令退出码均为 0，但标准输出均为空，表明服务未返回预期的 'Hello from Flask' 和 JSON 对象。可能原因是 Flask 应用未正确启动或路由返回空响应。验收标准1和2均未满足。",
     "files_written": [
-      "flask_app/requirements.txt",
-      "flask_app/app.py"
+      "output/flask_app/requirements.txt",
+      "output/flask_app/app.py",
+      "output/flask_app/run.sh"
     ]
   }
 ]

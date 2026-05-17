@@ -1,25 +1,24 @@
 {
   "passed": false,
-  "failure_type": "runtime_error",
-  "reason": "两个curl命令的标准输出均为空，未返回预期的'Hello World'或'OK'，HTTP状态码未知，服务可能未正常运行。",
+  "failure_type": "test_failure",
+  "reason": "两个 curl 命令退出码均为 0，但标准输出均为空，表明服务未返回预期的 'Hello from Flask' 和 JSON 对象。可能原因是 Flask 应用未正确启动或路由返回空响应。验收标准1和2均未满足。",
   "criterion_results": [
     {
-      "criterion": "curl http://localhost:5000/ 返回 'Hello World' 且 HTTP 状态码为 200",
+      "criterion": "curl -s http://localhost:5000/ 返回 'Hello from Flask'",
       "passed": false,
-      "evidence": "标准输出为空，未收到任何响应内容"
+      "evidence": "退出码 0 但标准输出为空，预期输出 'Hello from Flask' 未得到"
     },
     {
-      "criterion": "curl http://localhost:5000/health 返回 'OK' 且 HTTP 状态码为 200",
+      "criterion": "curl -s http://localhost:5000/health 返回 JSON 对象 {\"status\": \"healthy\"}",
       "passed": false,
-      "evidence": "标准输出为空，未收到任何响应内容"
+      "evidence": "退出码 0 但标准输出为空，预期 JSON 对象未得到"
     },
     {
-      "criterion": "服务启动后 3 秒内能够响应请求",
+      "criterion": "两个 curl 命令的退出码为 0，且输出非空",
       "passed": false,
-      "evidence": "无有效响应数据，无法验证"
+      "evidence": "退出码为 0 但输出为空，不满足输出非空条件"
     }
   ],
   "risk_level": "high",
-  "needs_human_review": true,
-  "suggested_fix": "确认服务进程是否存活（ps aux | grep flask），检查端口5000监听状态（netstat -tlnp | grep 5000），使用curl -v获取完整响应头和状态码，检查Flask启动日志是否有错误，确保服务器绑定在0.0.0.0或127.0.0.1并监听正确。如果服务已运行但无响应，排查网络或防火墙配置。"
+  "needs_human_review": true
 }

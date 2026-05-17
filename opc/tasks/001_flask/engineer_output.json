@@ -1,17 +1,13 @@
 {
   "files": [
     {
-      "path": "flask_app/app.py",
-      "content": "from flask import Flask\n\napp = Flask(__name__)\n\n@app.route('/')\ndef hello():\n    return 'Hello World'\n\n@app.route('/health')\ndef health():\n    return 'OK'\n\nif __name__ == '__main__':\n    app.run(host='0.0.0.0', port=5000, debug=False)\n"
-    },
-    {
-      "path": "flask_app/requirements.txt",
-      "content": "Flask\ngunicorn\n"
+      "path": "output/flask_app/run.sh",
+      "content": "#!/bin/bash\ncd \"$(dirname \"$0\")\"\npip install -r requirements.txt -q\nnohup python app.py > flask_app.log 2>&1 &\n# Wait for port 5000 to be listening\nfor i in {1..10}; do\n  if ss -tln | grep -q ':5000 '; then\n    echo \"Flask started on port 5000\" >> flask_app.log\n    break\n  fi\n  sleep 0.5\ndone\n"
     }
   ],
-  "summary": "修复服务响应失败问题：在requirements.txt中添加gunicorn依赖，确保gunicorn可用于启动服务；app.py代码已正确实现两个路由，无需修改。",
+  "summary": "修复 run.sh：添加 pip install 依赖安装，使用循环等待端口 5000 监听（最多等待 5 秒），确保服务启动后再退出，避免 curl 请求时服务尚未就绪。",
   "run_info": {
-    "start_command": "gunicorn -w 1 -b 0.0.0.0:5000 app:app",
+    "start_command": "bash output/flask_app/run.sh",
     "port": 5000,
     "language": "python"
   }

@@ -206,7 +206,7 @@ def build_engineer_prompt(
 ```
 
 **`run_info` 字段说明**：
-- `start_command`：服务启动命令（CLI 脚本不需要启动命令可省略）
+- `start_command`：服务启动命令（CLI 脚本不需要启动命令可省略）。**必须简单直接**，优先用 `uv run python app.py` 或 `python app.py`。**不要生成 shell 脚本**，不要用 `&` 后台运行（Looper 自动管理后台进程）。
 - `port`：服务监听的端口号（CLI 脚本可省略）
 - `language`：实现语言
 
