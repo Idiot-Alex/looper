@@ -558,8 +558,8 @@ def run_qa(status: dict) -> tuple[bool, str]:
                 # port 存在 → 自动构造 curl 测试命令
                 if not test_commands:
                     test_commands = [
-                        f"curl -s http://localhost:{run_info['port']}/",
-                        f"curl -s http://localhost:{run_info['port']}/health",
+                        f"curl -s --retry 3 --retry-delay 1 http://localhost:{run_info['port']}/",
+                        f"curl -s --retry 3 --retry-delay 1 http://localhost:{run_info['port']}/health",
                     ]
         except Exception:
             pass

@@ -1,19 +1,19 @@
 {
   "passed": false,
   "failure_type": "test_failure",
-  "reason": "两个测试命令均返回空标准输出，没有获得预期响应。对于 GET /，期望返回 'Hello from Flask'，实际输出为空；对于 GET /health，期望返回 JSON {\"status\": \"ok\"}，实际输出为空。虽然退出码为0，但无法验证路由是否正确响应，服务可能未正常运行或被屏蔽。",
+  "reason": "两个 curl 命令均返回退出码 0，但标准输出均为空，未收到预期响应内容（'Hello from Flask' 和 JSON 对象），因此不满足验收标准。",
   "criterion_results": [
     {
-      "criterion": "GET / 返回字符串 'Hello from Flask'",
+      "criterion": "GET / 响应状态码 200，返回 'Hello from Flask'",
       "passed": false,
-      "evidence": "curl 标准输出为空，未收到 'Hello from Flask'"
+      "evidence": "curl 退出码 0，但标准输出为空，未收到 'Hello from Flask'"
     },
     {
-      "criterion": "GET /health 返回 JSON 格式的 {\"status\": \"ok\"}，Content-Type 为 application/json",
+      "criterion": "GET /health 响应状态码 200，返回 JSON 对象 {\"status\": \"ok\"}",
       "passed": false,
-      "evidence": "curl 标准输出为空，未收到 JSON 响应，Content-Type 无法验证"
+      "evidence": "curl 退出码 0，但标准输出为空，未收到 JSON 对象"
     }
   ],
   "risk_level": "medium",
-  "needs_human_review": false
+  "needs_human_review": true
 }
