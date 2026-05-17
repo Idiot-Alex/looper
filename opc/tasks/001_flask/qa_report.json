@@ -1,24 +1,19 @@
 {
   "passed": false,
   "failure_type": "test_failure",
-  "reason": "两个 curl 命令退出码均为 0，但标准输出均为空，表明服务未返回预期的 'Hello from Flask' 和 JSON 对象。可能原因是 Flask 应用未正确启动或路由返回空响应。验收标准1和2均未满足。",
+  "reason": "两个测试命令均返回空标准输出，没有获得预期响应。对于 GET /，期望返回 'Hello from Flask'，实际输出为空；对于 GET /health，期望返回 JSON {\"status\": \"ok\"}，实际输出为空。虽然退出码为0，但无法验证路由是否正确响应，服务可能未正常运行或被屏蔽。",
   "criterion_results": [
     {
-      "criterion": "curl -s http://localhost:5000/ 返回 'Hello from Flask'",
+      "criterion": "GET / 返回字符串 'Hello from Flask'",
       "passed": false,
-      "evidence": "退出码 0 但标准输出为空，预期输出 'Hello from Flask' 未得到"
+      "evidence": "curl 标准输出为空，未收到 'Hello from Flask'"
     },
     {
-      "criterion": "curl -s http://localhost:5000/health 返回 JSON 对象 {\"status\": \"healthy\"}",
+      "criterion": "GET /health 返回 JSON 格式的 {\"status\": \"ok\"}，Content-Type 为 application/json",
       "passed": false,
-      "evidence": "退出码 0 但标准输出为空，预期 JSON 对象未得到"
-    },
-    {
-      "criterion": "两个 curl 命令的退出码为 0，且输出非空",
-      "passed": false,
-      "evidence": "退出码为 0 但输出为空，不满足输出非空条件"
+      "evidence": "curl 标准输出为空，未收到 JSON 响应，Content-Type 无法验证"
     }
   ],
-  "risk_level": "high",
-  "needs_human_review": true
+  "risk_level": "medium",
+  "needs_human_review": false
 }

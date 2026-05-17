@@ -1,16 +1,20 @@
 {
-  "goal": "在 output/flask_app/ 目录下创建 Flask 项目，实现根路径和 /health 路由",
+  "goal": "在 output/flask_app/ 目录下创建一个 Flask 应用，包含 / 和 /health 两个路由",
   "steps": [
-    "步骤1: 检查并清理 output/flask_app/ 目录，删除所有旧文件以避免残留影响",
-    "步骤2: 创建 requirements.txt 文件，仅包含 flask 一行，确保版本兼容",
-    "步骤3: 创建 app.py 文件，实现根路径 '/' 返回字符串 'Hello from Flask'，/health 路径返回 JSON 对象 {\"status\": \"healthy\"}，并使用 app.run(host='0.0.0.0', port=5000, debug=False) 直接启动",
-    "步骤4: 创建 run.sh 启动脚本，内容为 'cd /path/to/output/flask_app && python app.py' 并使用 nohup 在后台运行，同时输出日志到文件，并在启动后等待 2 秒确保服务就绪",
-    "步骤5: 使用 curl 测试前先检查进程是否在监听 5000 端口（例如 ss -tlnp | grep 5000），确认后再执行 curl 请求"
+    "创建 output/flask_app/ 目录",
+    "在 output/flask_app/ 下创建 app.py 文件",
+    "在 app.py 中导入 Flask 并创建应用实例",
+    "添加 '/' 路由，返回字符串 'Hello from Flask'",
+    "添加 '/health' 路由，返回 JSON {'status': 'ok'}",
+    "确保 app.py 可被直接运行（使用 if __name__ == '__main__'）"
   ],
   "acceptance_criteria": [
-    "标准1: curl -s http://localhost:5000/ 返回 'Hello from Flask'",
-    "标准2: curl -s http://localhost:5000/health 返回 JSON 对象 {\"status\": \"healthy\"}",
-    "标准3: 两个 curl 命令的退出码为 0，且输出非空"
+    "GET / 返回字符串 'Hello from Flask'",
+    "GET /health 返回 JSON 格式的 {\"status\": \"ok\"}，Content-Type 为 application/json"
   ],
-  "notes": "为避免前两次失败（curl返回空输出），本方案重点解决服务启动和端口监听问题：1) 使用 host='0.0.0.0' 确保监听所有网络接口，避免 localhost 绑定问题；2) run.sh 使用 nohup 后台运行并重定向输出到日志文件，以便调试；3) 启动后明确等待 2-3 秒再测试，防止服务未完全启动；4) 测试前先验证端口是否已监听，确保 Flask 进程实际运行；5) 目录路径使用绝对路径避免相对路径错误；6) 代码中避免任何语法错误或导入错误，使用最简单的 Flask 应用结构。"
+  "language": "python",
+  "dependencies": [
+    "flask==3.0"
+  ],
+  "notes": "Manager 不指定端口和测试命令，由 Engineer 在 run_info 中声明。项目文件必须放在 output/flask_app/ 目录下，主文件名为 app.py。"
 }

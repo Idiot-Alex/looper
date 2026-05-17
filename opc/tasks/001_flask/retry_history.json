@@ -1,27 +1,9 @@
 [
   {
     "failure_type": "test_failure",
-    "qa_summary": "两个 curl 命令均返回退出码 0，但标准输出为空，说明 Flask 服务未能正确返回预期的响应。虽然源码逻辑正确，但执行时服务可能未启动、端口未监听或存在其他运行时问题，导致根路径返回空而非 'Hello from Flask'，/health 返回空而非 JSON 对象。因此验收标准均未通过。",
+    "qa_summary": "两个测试命令均返回空标准输出，没有获得预期响应。对于 GET /，期望返回 'Hello from Flask'，实际输出为空；对于 GET /health，期望返回 JSON {\"status\": \"ok\"}，实际输出为空。虽然退出码为0，但无法验证路由是否正确响应，服务可能未正常运行或被屏蔽。",
     "files_written": [
       "output/flask_app/app.py"
-    ]
-  },
-  {
-    "failure_type": "test_failure",
-    "qa_summary": "两条 curl 命令均返回空输出，未返回预期的字符串或 JSON，表明 Flask 应用未正确响应请求。可能原因：应用代码缺失或路由配置错误。",
-    "files_written": [
-      "output/flask_app/requirements.txt",
-      "output/flask_app/app.py",
-      "output/flask_app/run.sh"
-    ]
-  },
-  {
-    "failure_type": "test_failure",
-    "qa_summary": "两个 curl 命令退出码均为 0，但标准输出均为空，表明服务未返回预期的 'Hello from Flask' 和 JSON 对象。可能原因是 Flask 应用未正确启动或路由返回空响应。验收标准1和2均未满足。",
-    "files_written": [
-      "output/flask_app/requirements.txt",
-      "output/flask_app/app.py",
-      "output/flask_app/run.sh"
     ]
   }
 ]
